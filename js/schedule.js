@@ -48,8 +48,10 @@ const Schedule = {
         
         await Storage.saveSchedule(schedule);
         
-        // 更新选手的填表状态
-        await Storage.updatePlayer(playerId, { hasFilledSchedule: true });
+        // 更新选手的填表状态：如果时间表为空，则认为未填表
+        await Storage.updatePlayer(playerId, { 
+            hasFilledSchedule: availableTimes && availableTimes.length > 0 
+        });
         
         // 更新共同空闲时间
         await Game.updateAllCommonTimes();
