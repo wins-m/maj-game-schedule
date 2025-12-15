@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>麻将比赛管理系统</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>麻将比赛管理系统</h1>
+            <div class="header-actions">
+                <button id="enter-scores-btn" class="btn btn-primary">录入积分</button>
+                <button id="export-data-btn" class="btn btn-secondary">导出数据</button>
+                <label for="import-data-btn" class="btn btn-secondary">导入数据</label>
+                <input type="file" id="import-data-btn" accept=".json" style="display: none;">
+                <button id="reset-game-btn" class="btn btn-danger">重置比赛</button>
+            </div>
+        </header>
+
+        <main>
+            <div id="round-info" class="round-info">
+                <div class="regroup-actions">
+                    <button id="regroup-random-btn" class="btn btn-secondary">随机重新分组</button>
+                    <button id="regroup-score-btn" class="btn btn-secondary">按积分重新分组</button>
+                </div>
+            </div>
+            
+            <div id="tables-container" class="tables-container">
+                <!-- 分桌表将在这里动态生成 -->
+            </div>
+        </main>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/game.js"></script>
+    <script src="js/schedule.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
+

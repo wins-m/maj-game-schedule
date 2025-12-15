@@ -1,0 +1,236 @@
+/* 个人时间表页面样式 */
+
+.player-info {
+    margin-bottom: 30px;
+    padding: 20px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border-radius: 8px;
+}
+
+.player-info h2 {
+    margin-bottom: 10px;
+}
+
+.schedule-instructions {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #e3f2fd;
+    border-left: 4px solid #2196F3;
+    border-radius: 6px;
+}
+
+.schedule-instructions p {
+    color: #1976d2;
+    margin: 5px 0;
+    font-weight: 500;
+}
+
+.schedule-instructions .batch-hint {
+    font-size: 13px;
+    color: #1565c0;
+    margin-top: 8px;
+}
+
+/* 时间表网格 */
+.schedule-table {
+    margin-bottom: 30px;
+    overflow-x: auto;
+}
+
+.schedule-grid {
+    width: 100%;
+    border-collapse: collapse;
+    background: white;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.schedule-grid thead {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.schedule-grid th {
+    padding: 15px;
+    text-align: center;
+    font-weight: 600;
+    border-right: 1px solid rgba(255, 255, 255, 0.2);
+    position: relative;
+}
+
+.schedule-grid th:last-child {
+    border-right: none;
+}
+
+.period-header {
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    user-select: none;
+}
+
+.period-header:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.period-header::after {
+    content: "📋";
+    margin-left: 5px;
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.schedule-grid tbody tr {
+    border-bottom: 1px solid #e0e0e0;
+    transition: background-color 0.3s ease;
+}
+
+.schedule-grid tbody tr:hover {
+    background: #f5f5f5;
+}
+
+.schedule-grid tbody tr:last-child {
+    border-bottom: none;
+}
+
+/* 日期单元格 */
+.day-cell {
+    padding: 15px;
+    text-align: center;
+    background: #f9f9f9;
+    font-weight: 600;
+    min-width: 120px;
+    cursor: pointer;
+    transition: background-color 0.3s ease;
+    user-select: none;
+}
+
+.day-cell:hover {
+    background: #e3f2fd;
+}
+
+.day-cell.batch-select-row {
+    position: relative;
+}
+
+.day-cell.batch-select-row::after {
+    content: "📅";
+    position: absolute;
+    right: 5px;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 12px;
+    opacity: 0.5;
+}
+
+.day-name {
+    font-size: 16px;
+    color: #333;
+    margin-bottom: 5px;
+}
+
+.weekday {
+    font-size: 12px;
+    color: #666;
+}
+
+/* 时间单元格 */
+.time-cell {
+    padding: 15px;
+    text-align: center;
+    width: 120px;
+}
+
+/* 复选框样式 */
+.time-checkbox {
+    display: inline-block;
+    position: relative;
+    cursor: pointer;
+    user-select: none;
+}
+
+.time-checkbox input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    cursor: pointer;
+    height: 0;
+    width: 0;
+}
+
+.checkmark {
+    display: inline-block;
+    width: 40px;
+    height: 40px;
+    background: #f0f0f0;
+    border: 3px solid #ddd;
+    border-radius: 8px;
+    transition: all 0.3s ease;
+    position: relative;
+}
+
+.time-checkbox:hover .checkmark {
+    background: #e0e0e0;
+    border-color: #667eea;
+}
+
+.time-checkbox input:checked ~ .checkmark {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border-color: #667eea;
+}
+
+.time-checkbox input:checked ~ .checkmark::after {
+    content: "✓";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 24px;
+    font-weight: bold;
+}
+
+/* 操作按钮区域 */
+.schedule-actions {
+    display: flex;
+    gap: 15px;
+    justify-content: center;
+    padding: 20px;
+}
+
+.schedule-actions .btn {
+    min-width: 150px;
+    padding: 12px 30px;
+    font-size: 16px;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .schedule-grid {
+        font-size: 14px;
+    }
+
+    .day-cell {
+        min-width: 100px;
+        padding: 10px;
+    }
+
+    .time-cell {
+        width: 80px;
+        padding: 10px;
+    }
+
+    .checkmark {
+        width: 35px;
+        height: 35px;
+    }
+
+    .schedule-actions {
+        flex-direction: column;
+    }
+
+    .schedule-actions .btn {
+        width: 100%;
+    }
+}
+

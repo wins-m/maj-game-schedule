@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>个人时间表</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/schedule.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>个人时间表</h1>
+            <a href="index.html" class="btn btn-secondary">返回分桌表</a>
+        </header>
+
+        <main>
+            <div id="player-info" class="player-info"></div>
+            
+            <div class="schedule-instructions">
+                <p>请勾选您未来7天的空闲时间段（早、中、晚）</p>
+                <p class="batch-hint">💡 提示：点击日期可批量选择整行，点击时段可批量选择整列</p>
+            </div>
+
+            <div id="schedule-table" class="schedule-table">
+                <!-- 时间表将在这里动态生成 -->
+            </div>
+
+            <div class="schedule-actions">
+                <button id="save-schedule-btn" class="btn btn-primary">保存时间表</button>
+                <button id="clear-schedule-btn" class="btn btn-secondary">清空选择</button>
+            </div>
+        </main>
+    </div>
+
+    <script src="js/storage.js"></script>
+    <script src="js/utils.js"></script>
+    <script src="js/schedule.js"></script>
+    <script>
+        // 个人时间表页面逻辑
+        (function() {
+            // 获取URL参数
+            const urlParams = new URLSearchParams(window.location.search);
+            const playerId = parseInt(urlParams.get('playerId'));
+
+            if (!playerId) {
+                alert('缺少选手ID参数');
+                window.location.href = 'index.html';
+                return;
+            }
+
+            // 初始化
+            Storage.init();
+            const player = Storage.getPlayer(playerId);
+            
+            if (!player) {
+                alert('选手不存在');
+                window.location.href = 'index.html';
+                return;
+            }
+
+            // 渲染选手信息
+            const playerInfoEl = document.getElementById('player-info');
+            playerInfoEl.innerHTML = `
+                <h2>${player.name} 的时间表</h2>
+                <p>当前积分：${player.totalScore}</p>
+            `;
+
+            // 渲染时间表
+            renderSchedule();
+
+            // 绑定事件
+            document.getElementById('save-schedule-btn').addEventListener('click', saveSchedule);
+            document.getElementById('clear-schedule-btn').addEventListener('click', clearSchedule);
+
+            /**
+             * 渲染时间表
+             */
+            function renderSchedule() {
+                const days = Utils.getNextDays(7);
+                const periods = Utils.getPeriods();
+                const selectedTimes = Schedule.getSelectedTimes(playerId);
+
+                let html = '<table class="schedule-grid"><thead><tr><th>日期</th>';
+                periods.forEach(period => {
+                    html += `<th class="period-header" data-period="${period.key}">${period.name}</th>`;
+                });
+                html += '</tr></thead><tbody>';
+
+                days.forEach(day => {
+                    html += `<tr>
+                        <td class="day-cell batch-select-row" data-day="${day.day}">
+                            <div class="day-name">${day.dateStr}</div>
+                            <div class="weekday">星期${day.weekday}</div>
+                        </td>`;
+                    
+                    periods.forEach(period => {
+                        const timeKey = Utils.getTimeKey(day.day, period.key);
+                        const isSelected = selectedTimes.includes(timeKey);
+                        html += `
+                            <td class="time-cell">
+                                <label class="time-checkbox">
+                                    <input type="checkbox" 
+                                           data-day="${day.day}" 
+                                           data-period="${period.key}"
+                                           ${isSelected ? 'checked' : ''}>
+                                    <span class="checkmark"></span>
+                                </label>
+                            </td>
+                        `;
+                    });
+                    
+                    html += '</tr>';
+                });
+
+                html += '</tbody></table>';
+
+                document.getElementById('schedule-table').innerHTML = html;
+
+                // 绑定复选框事件
+                document.querySelectorAll('.time-checkbox input').forEach(checkbox => {
+                    checkbox.addEventListener('change', function() {
+                        const day = parseInt(this.dataset.day);
+                        const period = this.dataset.period;
+                        Schedule.toggleTimeSlot(playerId, day, period);
+                        // 更新显示
+                        updateCheckboxState(day, period);
+                    });
+                });
+
+                // 绑定整行选择（点击日期单元格）
+                document.querySelectorAll('.batch-select-row').forEach(cell => {
+                    cell.addEventListener('click', function(e) {
+                        // 如果点击的是复选框，不触发整行选择
+                        if (e.target.closest('.time-checkbox')) return;
+                        
+                        const day = parseInt(this.dataset.day);
+                        toggleRow(day);
+                    });
+                });
+
+                // 绑定整列选择（点击时段表头）
+                document.querySelectorAll('.period-header').forEach(header => {
+                    header.addEventListener('click', function() {
+                        const period = this.dataset.period;
+                        toggleColumn(period);
+                    });
+                });
+            }
+
+            /**
+             * 切换整行选择
+             */
+            function toggleRow(day) {
+                const periods = Utils.getPeriods();
+                let selectedTimes = Schedule.getSelectedTimes(playerId);
+                
+                // 检查该行是否全部选中
+                const rowTimes = periods.map(p => Utils.getTimeKey(day, p.key));
+                const allSelected = rowTimes.every(timeKey => selectedTimes.includes(timeKey));
+                
+                periods.forEach(period => {
+                    const timeKey = Utils.getTimeKey(day, period.key);
+                    if (allSelected) {
+                        // 全部取消
+                        if (selectedTimes.includes(timeKey)) {
+                            Schedule.toggleTimeSlot(playerId, day, period.key);
+                            selectedTimes = Schedule.getSelectedTimes(playerId); // 更新状态
+                        }
+                    } else {
+                        // 全部选中
+                        if (!selectedTimes.includes(timeKey)) {
+                            Schedule.toggleTimeSlot(playerId, day, period.key);
+                            selectedTimes = Schedule.getSelectedTimes(playerId); // 更新状态
+                        }
+                    }
+                    updateCheckboxState(day, period.key);
+                });
+            }
+
+            /**
+             * 切换整列选择
+             */
+            function toggleColumn(period) {
+                const days = Utils.getNextDays(7);
+                let selectedTimes = Schedule.getSelectedTimes(playerId);
+                
+                // 检查该列是否全部选中
+                const columnTimes = days.map(d => Utils.getTimeKey(d.day, period));
+                const allSelected = columnTimes.every(timeKey => selectedTimes.includes(timeKey));
+                
+                days.forEach(day => {
+                    const timeKey = Utils.getTimeKey(day.day, period);
+                    if (allSelected) {
+                        // 全部取消
+                        if (selectedTimes.includes(timeKey)) {
+                            Schedule.toggleTimeSlot(playerId, day.day, period);
+                            selectedTimes = Schedule.getSelectedTimes(playerId); // 更新状态
+                        }
+                    } else {
+                        // 全部选中
+                        if (!selectedTimes.includes(timeKey)) {
+                            Schedule.toggleTimeSlot(playerId, day.day, period);
+                            selectedTimes = Schedule.getSelectedTimes(playerId); // 更新状态
+                        }
+                    }
+                    updateCheckboxState(day.day, period);
+                });
+            }
+
+            /**
+             * 更新复选框状态显示
+             */
+            function updateCheckboxState(day, period) {
+                const checkbox = document.querySelector(
+                    `input[data-day="${day}"][data-period="${period}"]`
+                );
+                if (checkbox) {
+                    const selectedTimes = Schedule.getSelectedTimes(playerId);
+                    const timeKey = Utils.getTimeKey(day, period);
+                    checkbox.checked = selectedTimes.includes(timeKey);
+                }
+            }
+
+            /**
+             * 保存时间表
+             */
+            function saveSchedule() {
+                // 从所有checkbox获取当前选择状态
+                const selectedTimes = [];
+                document.querySelectorAll('.time-checkbox input:checked').forEach(checkbox => {
+                    const day = parseInt(checkbox.dataset.day);
+                    const period = checkbox.dataset.period;
+                    selectedTimes.push(Utils.getTimeKey(day, period));
+                });
+                
+                Schedule.savePlayerSchedule(playerId, selectedTimes);
+                
+                // 延迟返回，让用户看到成功提示
+                setTimeout(() => {
+                    window.location.href = 'index.html';
+                }, 1000);
+            }
+
+            /**
+             * 清空选择
+             */
+            function clearSchedule() {
+                if (Utils.confirm('确定要清空所有选择吗？')) {
+                    Schedule.savePlayerSchedule(playerId, []);
+                    renderSchedule();
+                    Utils.showMessage('已清空选择', 'success');
+                }
+            }
+        })();
+    </script>
+</body>
+</html>
+
