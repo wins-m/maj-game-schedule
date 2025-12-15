@@ -150,7 +150,10 @@ const Storage = {
      */
     async getSchedules() {
         try {
-            return await this.apiRequest('/schedules');
+            const schedules = await this.apiRequest('/schedules');
+            // 更新缓存
+            this._schedulesCache = schedules;
+            return schedules;
         } catch (error) {
             console.error('获取时间表数据失败:', error);
             return [];
@@ -160,26 +163,44 @@ const Storage = {
     async saveSchedules(schedules) {
         try {
             await this.apiRequest('/schedules', 'POST', schedules);
+            // 更新缓存
+            this._schedulesCache = schedules;
             return true;
         } catch (error) {
             console.error('保存时间表数据失败:', error);
+            // 保存失败时清除缓存，确保下次获取最新数据
+            this._schedulesCache = null;
             return false;
         }
     },
 
     async getSchedule(playerId) {
-        const schedules = await this.getSchedules();
+        // 优化：优先使用缓存，避免重复请求
+        let schedules = this._schedulesCache;
+        if (!schedules) {
+            schedules = await this.getSchedules();
+        }
         return schedules.find(s => s.playerId === playerId);
     },
 
     async saveSchedule(schedule) {
-        const schedules = await this.getSchedules();
+        // 优化：如果已经有 schedules 缓存，直接使用，避免重复请求
+        // 否则才获取所有时间表
+        let schedules = this._schedulesCache;
+        if (!schedules) {
+            schedules = await this.getSchedules();
+        }
+        
         const index = schedules.findIndex(s => s.playerId === schedule.playerId);
         if (index !== -1) {
             schedules[index] = schedule;
         } else {
             schedules.push(schedule);
         }
+        
+        // 更新缓存
+        this._schedulesCache = schedules;
+        
         await this.saveSchedules(schedules);
     },
 

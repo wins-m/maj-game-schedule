@@ -129,9 +129,10 @@
                     checkbox.addEventListener('change', async function() {
                         const date = this.dataset.date;
                         const period = this.dataset.period;
-                        await Schedule.toggleTimeSlot(playerId, date, period);
-                        // 更新显示
-                        await updateCheckboxState(date, period);
+                        const updatedTimes = await Schedule.toggleTimeSlot(playerId, date, period);
+                        // 直接使用返回值更新复选框状态，避免重复请求
+                        const timeKey = Utils.getTimeKey(date, period);
+                        this.checked = updatedTimes.includes(timeKey);
                     });
                 });
 
@@ -175,17 +176,16 @@
                     if (allSelected) {
                         // 全部取消
                         if (selectedTimes.includes(timeKey)) {
-                            await Schedule.toggleTimeSlot(playerId, dateStr, period.key);
-                            selectedTimes = await Schedule.getSelectedTimes(playerId); // 更新状态
+                            selectedTimes = await Schedule.toggleTimeSlot(playerId, dateStr, period.key);
                         }
                     } else {
                         // 全部选中
                         if (!selectedTimes.includes(timeKey)) {
-                            await Schedule.toggleTimeSlot(playerId, dateStr, period.key);
-                            selectedTimes = await Schedule.getSelectedTimes(playerId); // 更新状态
+                            selectedTimes = await Schedule.toggleTimeSlot(playerId, dateStr, period.key);
                         }
                     }
-                    await updateCheckboxState(dateStr, period.key);
+                    // 使用更新后的状态更新复选框，避免重复请求
+                    updateCheckboxState(dateStr, period.key, selectedTimes);
                 }
             }
 
@@ -206,29 +206,27 @@
                     if (allSelected) {
                         // 全部取消
                         if (selectedTimes.includes(timeKey)) {
-                            await Schedule.toggleTimeSlot(playerId, day.dateStr, period);
-                            selectedTimes = await Schedule.getSelectedTimes(playerId); // 更新状态
+                            selectedTimes = await Schedule.toggleTimeSlot(playerId, day.dateStr, period);
                         }
                     } else {
                         // 全部选中
                         if (!selectedTimes.includes(timeKey)) {
-                            await Schedule.toggleTimeSlot(playerId, day.dateStr, period);
-                            selectedTimes = await Schedule.getSelectedTimes(playerId); // 更新状态
+                            selectedTimes = await Schedule.toggleTimeSlot(playerId, day.dateStr, period);
                         }
                     }
-                    await updateCheckboxState(day.dateStr, period);
+                    // 使用更新后的状态更新复选框，避免重复请求
+                    updateCheckboxState(day.dateStr, period, selectedTimes);
                 }
             }
 
             /**
-             * 更新复选框状态显示
+             * 更新复选框状态显示（使用已提供的时间列表，避免重复请求）
              */
-            async function updateCheckboxState(dateStr, period) {
+            function updateCheckboxState(dateStr, period, selectedTimes) {
                 const checkbox = document.querySelector(
                     `input[data-date="${dateStr}"][data-period="${period}"]`
                 );
                 if (checkbox) {
-                    const selectedTimes = await Schedule.getSelectedTimes(playerId);
                     const timeKey = Utils.getTimeKey(dateStr, period);
                     checkbox.checked = selectedTimes.includes(timeKey);
                 }
