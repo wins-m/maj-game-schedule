@@ -136,8 +136,8 @@ const Game = {
      * @param {number} round - 场次编号
      * @param {string} method - 分组方法：'score'（按积分）, 'random'（随机）, 默认按积分
      */
-    createGame(round, method = 'score') {
-        const players = Storage.getPlayers();
+    async createGame(round, method = 'score') {
+        const players = await Storage.getPlayers();
         let tables;
         
         if (method === 'random') {
@@ -155,7 +155,7 @@ const Game = {
             createdAt: new Date().toISOString()
         };
         
-        Storage.saveGame(game);
+        await Storage.saveGame(game);
         return game;
     },
 
@@ -163,14 +163,14 @@ const Game = {
      * 重新分组当前场次
      * @param {string} method - 分组方法：'score'（按积分）, 'random'（随机）
      */
-    regroupCurrentGame(method = 'random') {
-        const game = this.getCurrentGame();
+    async regroupCurrentGame(method = 'random') {
+        const game = await this.getCurrentGame();
         if (!game || game.isCompleted) {
             Utils.showMessage('当前场次已完成或不存在', 'error');
             return false;
         }
         
-        const players = Storage.getPlayers();
+        const players = await Storage.getPlayers();
         let tables;
         
         if (method === 'random') {
@@ -182,7 +182,7 @@ const Game = {
         }
         
         game.tables = tables;
-        Storage.saveGame(game);
+        await Storage.saveGame(game);
         
         Utils.showMessage(`已${method === 'random' ? '随机' : '按积分'}重新分组`, 'success');
         return true;
@@ -192,9 +192,9 @@ const Game = {
      * 完成当前场次并录入积分
      * @param {Object} scores - 积分对象 { playerId: score }
      */
-    completeRound(scores) {
-        const currentRound = Storage.getCurrentRound();
-        const game = Storage.getGame(currentRound);
+    async completeRound(scores) {
+        const currentRound = await Storage.getCurrentRound();
+        const game = await Storage.getGame(currentRound);
         
         if (!game) {
             Utils.showMessage('当前场次不存在', 'error');
@@ -202,7 +202,7 @@ const Game = {
         }
         
         // 更新选手积分
-        const players = Storage.getPlayers();
+        const players = await Storage.getPlayers();
         players.forEach(player => {
             const score = scores[player.id] || 0;
             player.scores.push(score);
@@ -210,17 +210,17 @@ const Game = {
             // 重置时间表填写状态
             player.hasFilledSchedule = false;
         });
-        Storage.savePlayers(players);
+        await Storage.savePlayers(players);
         
         // 标记当前场次为已完成
         game.isCompleted = true;
-        Storage.saveGame(game);
+        await Storage.saveGame(game);
         
         // 创建下一场次
         const nextRound = currentRound + 1;
         if (nextRound <= 6) { // 默认6场
-            Storage.setCurrentRound(nextRound);
-            this.createGame(nextRound);
+            await Storage.setCurrentRound(nextRound);
+            await this.createGame(nextRound);
             Utils.showMessage(`第${currentRound}场已完成，已生成第${nextRound}场分桌`, 'success');
         } else {
             Utils.showMessage('所有比赛场次已完成！', 'success');
@@ -232,17 +232,17 @@ const Game = {
     /**
      * 获取当前场次
      */
-    getCurrentGame() {
-        const currentRound = Storage.getCurrentRound();
-        return Storage.getGame(currentRound);
+    async getCurrentGame() {
+        const currentRound = await Storage.getCurrentRound();
+        return await Storage.getGame(currentRound);
     },
 
     /**
      * 计算一桌的共同空闲时间
      * @param {Array} playerIds - 选手ID数组
      */
-    calculateCommonTimes(playerIds) {
-        const schedules = Storage.getSchedules();
+    async calculateCommonTimes(playerIds) {
+        const schedules = await Storage.getSchedules();
         const playerSchedules = playerIds.map(id => 
             schedules.find(s => s.playerId === id)
         ).filter(s => s); // 过滤掉未填表的选手
@@ -291,15 +291,15 @@ const Game = {
     /**
      * 更新所有桌的共同空闲时间
      */
-    updateAllCommonTimes() {
-        const game = this.getCurrentGame();
+    async updateAllCommonTimes() {
+        const game = await this.getCurrentGame();
         if (!game) return;
         
-        game.tables.forEach(table => {
-            table.commonTimes = this.calculateCommonTimes(table.players);
-        });
+        for (const table of game.tables) {
+            table.commonTimes = await this.calculateCommonTimes(table.players);
+        }
         
-        Storage.saveGame(game);
+        await Storage.saveGame(game);
     }
 };
 

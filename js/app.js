@@ -6,35 +6,96 @@ const App = {
     /**
      * 初始化应用
      */
-    init() {
-        Storage.init();
-        this.renderMainPage();
-        this.bindEvents();
+    async init() {
+        try {
+            // 显示加载提示
+            this.showLoading();
+            
+            await Storage.init();
+            await this.renderMainPage();
+            this.bindEvents();
+            
+            // 隐藏加载提示，显示内容
+            this.hideLoading();
+            this.showContent();
+        } catch (error) {
+            console.error('初始化失败:', error);
+            this.hideLoading();
+            this.showError('连接服务器失败，请检查网络连接和服务器状态');
+        }
+    },
+
+    /**
+     * 显示加载提示
+     */
+    showLoading() {
+        const loadingEl = document.getElementById('loading-message');
+        const errorEl = document.getElementById('error-message');
+        if (loadingEl) loadingEl.style.display = 'block';
+        if (errorEl) errorEl.style.display = 'none';
+    },
+
+    /**
+     * 隐藏加载提示
+     */
+    hideLoading() {
+        const loadingEl = document.getElementById('loading-message');
+        if (loadingEl) loadingEl.style.display = 'none';
+    },
+
+    /**
+     * 显示内容区域
+     */
+    showContent() {
+        const roundInfo = document.getElementById('round-info');
+        const regroupActions = document.querySelector('.regroup-actions');
+        const tablesContainer = document.getElementById('tables-container');
+        
+        if (roundInfo) roundInfo.style.display = 'block';
+        if (regroupActions) regroupActions.style.display = 'flex';
+        if (tablesContainer) tablesContainer.style.display = 'grid';
+    },
+
+    /**
+     * 显示错误信息
+     */
+    showError(message) {
+        const errorEl = document.getElementById('error-message');
+        if (errorEl) {
+            errorEl.querySelector('p').textContent = message;
+            errorEl.style.display = 'block';
+        }
+        Utils.showMessage(message, 'error');
     },
 
     /**
      * 渲染主页面
      */
-    renderMainPage() {
-        const game = Game.getCurrentGame();
-        const players = Storage.getPlayers();
-        const currentRound = Storage.getCurrentRound();
-        
-        if (!game) {
-            // 如果没有当前场次，创建第一场
-            Game.createGame(1);
-            this.renderMainPage();
-            return;
+    async renderMainPage() {
+        try {
+            const game = await Game.getCurrentGame();
+            const players = await Storage.getPlayers();
+            const currentRound = await Storage.getCurrentRound();
+            
+            if (!game) {
+                // 如果没有当前场次，创建第一场
+                await Game.createGame(1);
+                await this.renderMainPage();
+                return;
+            }
+            
+            // 渲染分桌表
+            this.renderTables(game, players);
+            
+            // 渲染场次信息
+            this.renderRoundInfo(currentRound, game.isCompleted);
+            
+            // 更新共同空闲时间
+            await Game.updateAllCommonTimes();
+        } catch (error) {
+            console.error('渲染主页面失败:', error);
+            Utils.showMessage('加载数据失败', 'error');
         }
-        
-        // 渲染分桌表
-        this.renderTables(game, players);
-        
-        // 渲染场次信息
-        this.renderRoundInfo(currentRound, game.isCompleted);
-        
-        // 更新共同空闲时间
-        Game.updateAllCommonTimes();
     },
 
     /**
@@ -131,52 +192,64 @@ const App = {
         // 积分录入按钮
         const scoreBtn = document.getElementById('enter-scores-btn');
         if (scoreBtn) {
-            scoreBtn.addEventListener('click', () => this.showScoreDialog());
+            scoreBtn.addEventListener('click', async () => {
+                await this.showScoreDialog();
+            });
         }
         
         // 重置比赛按钮
         const resetBtn = document.getElementById('reset-game-btn');
         if (resetBtn) {
-            resetBtn.addEventListener('click', () => this.resetGame());
+            resetBtn.addEventListener('click', async () => {
+                await this.resetGame();
+            });
         }
         
         // 导出数据按钮
         const exportBtn = document.getElementById('export-data-btn');
         if (exportBtn) {
-            exportBtn.addEventListener('click', () => this.exportData());
+            exportBtn.addEventListener('click', async () => {
+                await this.exportData();
+            });
         }
         
         // 导入数据按钮
         const importBtn = document.getElementById('import-data-btn');
         if (importBtn) {
-            importBtn.addEventListener('change', (e) => this.importData(e));
+            importBtn.addEventListener('change', async (e) => {
+                await this.importData(e);
+            });
         }
         
         // 随机重新分组按钮
         const regroupRandomBtn = document.getElementById('regroup-random-btn');
         if (regroupRandomBtn) {
-            regroupRandomBtn.addEventListener('click', () => this.regroupGame('random'));
+            regroupRandomBtn.addEventListener('click', async () => {
+                await this.regroupGame('random');
+            });
         }
         
         // 按积分重新分组按钮
         const regroupScoreBtn = document.getElementById('regroup-score-btn');
         if (regroupScoreBtn) {
-            regroupScoreBtn.addEventListener('click', () => this.regroupGame('score'));
+            regroupScoreBtn.addEventListener('click', async () => {
+                await this.regroupGame('score');
+            });
         }
     },
 
     /**
      * 显示积分录入对话框
      */
-    showScoreDialog() {
-        const game = Game.getCurrentGame();
+    async showScoreDialog() {
+        const game = await Game.getCurrentGame();
         if (!game || game.isCompleted) {
             Utils.showMessage('当前场次已完成或不存在', 'error');
             return;
         }
         
-        const players = Storage.getPlayers();
-        const currentRound = Storage.getCurrentRound();
+        const players = await Storage.getPlayers();
+        const currentRound = await Storage.getCurrentRound();
         
         // 创建对话框
         const dialog = document.createElement('div');
@@ -207,9 +280,9 @@ const App = {
         document.body.appendChild(dialog);
         
         // 绑定事件
-        document.getElementById('score-form').addEventListener('submit', (e) => {
+        document.getElementById('score-form').addEventListener('submit', async (e) => {
             e.preventDefault();
-            this.submitScores(dialog);
+            await this.submitScores(dialog);
         });
         
         document.getElementById('cancel-score-btn').addEventListener('click', () => {
@@ -220,7 +293,7 @@ const App = {
     /**
      * 提交积分
      */
-    submitScores(dialog) {
+    async submitScores(dialog) {
         const form = document.getElementById('score-form');
         const formData = new FormData(form);
         const scores = {};
@@ -230,53 +303,60 @@ const App = {
             scores[playerId] = parseInt(value) || 0;
         });
         
-        if (Game.completeRound(scores)) {
+        if (await Game.completeRound(scores)) {
             dialog.remove();
-            this.renderMainPage();
+            await this.renderMainPage();
         }
     },
 
     /**
      * 重置比赛
      */
-    resetGame() {
+    async resetGame() {
         if (Utils.confirm('确定要重置所有比赛数据吗？此操作不可恢复！')) {
-            Storage.clearAll();
+            await Storage.clearAll();
             Utils.showMessage('比赛数据已重置', 'success');
-            this.renderMainPage();
+            await this.renderMainPage();
         }
     },
 
     /**
      * 导出数据
      */
-    exportData() {
-        const data = Storage.exportData();
-        const dataStr = JSON.stringify(data, null, 2);
-        const blob = new Blob([dataStr], { type: 'application/json' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `majgame_backup_${new Date().toISOString().split('T')[0]}.json`;
-        a.click();
-        URL.revokeObjectURL(url);
-        Utils.showMessage('数据已导出', 'success');
+    async exportData() {
+        try {
+            const data = await Storage.exportData();
+            const dataStr = JSON.stringify(data, null, 2);
+            const blob = new Blob([dataStr], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `majgame_backup_${new Date().toISOString().split('T')[0]}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+            Utils.showMessage('数据已导出', 'success');
+        } catch (error) {
+            Utils.showMessage('导出数据失败', 'error');
+        }
     },
 
     /**
      * 导入数据
      */
-    importData(event) {
+    async importData(event) {
         const file = event.target.files[0];
         if (!file) return;
         
         const reader = new FileReader();
-        reader.onload = (e) => {
+        reader.onload = async (e) => {
             try {
                 const data = JSON.parse(e.target.result);
-                Storage.importData(data);
-                Utils.showMessage('数据已导入', 'success');
-                this.renderMainPage();
+                if (await Storage.importData(data)) {
+                    Utils.showMessage('数据已导入', 'success');
+                    await this.renderMainPage();
+                } else {
+                    Utils.showMessage('导入失败', 'error');
+                }
             } catch (error) {
                 Utils.showMessage('导入失败：文件格式错误', 'error');
             }
@@ -288,8 +368,8 @@ const App = {
     /**
      * 重新分组
      */
-    regroupGame(method) {
-        const game = Game.getCurrentGame();
+    async regroupGame(method) {
+        const game = await Game.getCurrentGame();
         if (!game || game.isCompleted) {
             Utils.showMessage('当前场次已完成或不存在', 'error');
             return;
@@ -300,8 +380,8 @@ const App = {
             : '确定要按积分重新分组吗？当前分桌将被替换。';
         
         if (Utils.confirm(confirmMsg)) {
-            if (Game.regroupCurrentGame(method)) {
-                this.renderMainPage();
+            if (await Game.regroupCurrentGame(method)) {
+                await this.renderMainPage();
             }
         }
     },
@@ -309,8 +389,8 @@ const App = {
     /**
      * 显示重命名对话框
      */
-    showRenameDialog(playerId) {
-        const player = Storage.getPlayer(playerId);
+    async showRenameDialog(playerId) {
+        const player = await Storage.getPlayer(playerId);
         if (!player) return;
         
         const dialog = document.createElement('div');
@@ -338,16 +418,16 @@ const App = {
         document.body.appendChild(dialog);
         
         // 绑定事件
-        document.getElementById('rename-form').addEventListener('submit', (e) => {
+        document.getElementById('rename-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             const formData = new FormData(e.target);
             const newName = formData.get('player_name').trim();
             
             if (newName && newName !== player.name) {
-                Storage.updatePlayer(playerId, { name: newName });
+                await Storage.updatePlayer(playerId, { name: newName });
                 Utils.showMessage('选手名称已更新', 'success');
                 dialog.remove();
-                this.renderMainPage();
+                await this.renderMainPage();
             } else {
                 Utils.showMessage('名称未更改', 'info');
             }
@@ -364,9 +444,19 @@ const App = {
 };
 
 // 页面加载完成后初始化
-if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', () => App.init());
-} else {
-    App.init();
-}
+(function() {
+    async function initialize() {
+        try {
+            await App.init();
+        } catch (error) {
+            console.error('应用初始化失败:', error);
+        }
+    }
+    
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initialize);
+    } else {
+        initialize();
+    }
+})();
 

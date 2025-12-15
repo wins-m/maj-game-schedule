@@ -1,0 +1,19 @@
+version: '3.8'
+
+services:
+  majgame:
+    build: .
+    container_name: majgame
+    ports:
+      - "1414:1414"
+    volumes:
+      - ./server/data:/app/server/data
+      - ./index.html:/app/index.html
+      - ./player-schedule.html:/app/player-schedule.html
+      - ./css:/app/css
+      - ./js:/app/js
+    restart: unless-stopped
+    environment:
+      - NODE_ENV=production
+      - PORT=1414
+

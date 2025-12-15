@@ -33,7 +33,7 @@
         </main>
     </div>
 
-    <script src="js/storage.js"></script>
+    <script src="js/storage-api.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/schedule.js"></script>
     <script>
@@ -50,24 +50,31 @@
             }
 
             // 初始化
-            Storage.init();
-            const player = Storage.getPlayer(playerId);
-            
-            if (!player) {
-                alert('选手不存在');
-                window.location.href = 'index.html';
-                return;
-            }
+            (async function() {
+                try {
+                    await Storage.init();
+                    const player = await Storage.getPlayer(playerId);
+                    
+                    if (!player) {
+                        alert('选手不存在');
+                        window.location.href = 'index.html';
+                        return;
+                    }
 
-            // 渲染选手信息
-            const playerInfoEl = document.getElementById('player-info');
-            playerInfoEl.innerHTML = `
-                <h2>${player.name} 的时间表</h2>
-                <p>当前积分：${player.totalScore}</p>
-            `;
+                    // 渲染选手信息
+                    const playerInfoEl = document.getElementById('player-info');
+                    playerInfoEl.innerHTML = `
+                        <h2>${player.name} 的时间表</h2>
+                        <p>当前积分：${player.totalScore}</p>
+                    `;
 
-            // 渲染时间表
-            renderSchedule();
+                    // 渲染时间表
+                    await renderSchedule();
+                } catch (error) {
+                    console.error('初始化失败:', error);
+                    alert('加载数据失败，请检查网络连接');
+                }
+            })();
 
             // 绑定事件
             document.getElementById('save-schedule-btn').addEventListener('click', saveSchedule);
@@ -76,10 +83,10 @@
             /**
              * 渲染时间表
              */
-            function renderSchedule() {
+            async function renderSchedule() {
                 const days = Utils.getNextDays(7);
                 const periods = Utils.getPeriods();
-                const selectedTimes = Schedule.getSelectedTimes(playerId);
+                const selectedTimes = await Schedule.getSelectedTimes(playerId);
 
                 let html = '<table class="schedule-grid"><thead><tr><th>日期</th>';
                 periods.forEach(period => {
@@ -119,34 +126,34 @@
 
                 // 绑定复选框事件
                 document.querySelectorAll('.time-checkbox input').forEach(checkbox => {
-                    checkbox.addEventListener('change', function() {
+                    checkbox.addEventListener('change', async function() {
                         const date = this.dataset.date;
                         const period = this.dataset.period;
-                        Schedule.toggleTimeSlot(playerId, date, period);
+                        await Schedule.toggleTimeSlot(playerId, date, period);
                         // 更新显示
-                        updateCheckboxState(date, period);
+                        await updateCheckboxState(date, period);
                     });
                 });
 
                 // 绑定整行选择（点击日期单元格）
                 document.querySelectorAll('.batch-select-row').forEach(cell => {
-                    cell.addEventListener('click', function(e) {
+                    cell.addEventListener('click', async function(e) {
                         // 如果点击的是复选框，不触发整行选择
                         if (e.target.closest('.time-checkbox')) return;
                         
                         const dateStr = this.dataset.date || 
                             this.querySelector('.day-name')?.textContent;
                         if (dateStr) {
-                            toggleRow(dateStr);
+                            await toggleRow(dateStr);
                         }
                     });
                 });
 
                 // 绑定整列选择（点击时段表头）
                 document.querySelectorAll('.period-header').forEach(header => {
-                    header.addEventListener('click', function() {
+                    header.addEventListener('click', async function() {
                         const period = this.dataset.period;
-                        toggleColumn(period);
+                        await toggleColumn(period);
                     });
                 });
             }
@@ -154,72 +161,74 @@
             /**
              * 切换整行选择
              */
-            function toggleRow(dateStr) {
+            async function toggleRow(dateStr) {
                 const periods = Utils.getPeriods();
-                let selectedTimes = Schedule.getSelectedTimes(playerId);
+                let selectedTimes = await Schedule.getSelectedTimes(playerId);
                 
                 // 检查该行是否全部选中
                 const rowTimes = periods.map(p => Utils.getTimeKey(dateStr, p.key));
                 const allSelected = rowTimes.every(timeKey => selectedTimes.includes(timeKey));
                 
-                periods.forEach(period => {
+                // 使用for...of循环替代forEach，以支持await
+                for (const period of periods) {
                     const timeKey = Utils.getTimeKey(dateStr, period.key);
                     if (allSelected) {
                         // 全部取消
                         if (selectedTimes.includes(timeKey)) {
-                            Schedule.toggleTimeSlot(playerId, dateStr, period.key);
-                            selectedTimes = Schedule.getSelectedTimes(playerId); // 更新状态
+                            await Schedule.toggleTimeSlot(playerId, dateStr, period.key);
+                            selectedTimes = await Schedule.getSelectedTimes(playerId); // 更新状态
                         }
                     } else {
                         // 全部选中
                         if (!selectedTimes.includes(timeKey)) {
-                            Schedule.toggleTimeSlot(playerId, dateStr, period.key);
-                            selectedTimes = Schedule.getSelectedTimes(playerId); // 更新状态
+                            await Schedule.toggleTimeSlot(playerId, dateStr, period.key);
+                            selectedTimes = await Schedule.getSelectedTimes(playerId); // 更新状态
                         }
                     }
-                    updateCheckboxState(dateStr, period.key);
-                });
+                    await updateCheckboxState(dateStr, period.key);
+                }
             }
 
             /**
              * 切换整列选择
              */
-            function toggleColumn(period) {
+            async function toggleColumn(period) {
                 const days = Utils.getNextDays(7);
-                let selectedTimes = Schedule.getSelectedTimes(playerId);
+                let selectedTimes = await Schedule.getSelectedTimes(playerId);
                 
                 // 检查该列是否全部选中
                 const columnTimes = days.map(d => Utils.getTimeKey(d.dateStr, period));
                 const allSelected = columnTimes.every(timeKey => selectedTimes.includes(timeKey));
                 
-                days.forEach(day => {
+                // 使用for...of循环替代forEach，以支持await
+                for (const day of days) {
                     const timeKey = Utils.getTimeKey(day.dateStr, period);
                     if (allSelected) {
                         // 全部取消
                         if (selectedTimes.includes(timeKey)) {
-                            Schedule.toggleTimeSlot(playerId, day.dateStr, period);
-                            selectedTimes = Schedule.getSelectedTimes(playerId); // 更新状态
+                            await Schedule.toggleTimeSlot(playerId, day.dateStr, period);
+                            selectedTimes = await Schedule.getSelectedTimes(playerId); // 更新状态
                         }
                     } else {
                         // 全部选中
                         if (!selectedTimes.includes(timeKey)) {
-                            Schedule.toggleTimeSlot(playerId, day.dateStr, period);
-                            selectedTimes = Schedule.getSelectedTimes(playerId); // 更新状态
+                            await Schedule.toggleTimeSlot(playerId, day.dateStr, period);
+                            selectedTimes = await Schedule.getSelectedTimes(playerId); // 更新状态
                         }
                     }
-                    updateCheckboxState(day.dateStr, period);
-                });
+                    await updateCheckboxState(day.dateStr, period);
+                }
             }
 
             /**
              * 更新复选框状态显示
              */
-            function updateCheckboxState(dateStr, period) {
+            async function updateCheckboxState(dateStr, period) {
                 const checkbox = document.querySelector(
                     `input[data-date="${dateStr}"][data-period="${period}"]`
                 );
                 if (checkbox) {
-                    const selectedTimes = Schedule.getSelectedTimes(playerId);
+                    const selectedTimes = await Schedule.getSelectedTimes(playerId);
                     const timeKey = Utils.getTimeKey(dateStr, period);
                     checkbox.checked = selectedTimes.includes(timeKey);
                 }
@@ -228,7 +237,7 @@
             /**
              * 保存时间表
              */
-            function saveSchedule() {
+            async function saveSchedule() {
                 // 从所有checkbox获取当前选择状态
                 const selectedTimes = [];
                 document.querySelectorAll('.time-checkbox input:checked').forEach(checkbox => {
@@ -237,7 +246,7 @@
                     selectedTimes.push(Utils.getTimeKey(date, period));
                 });
                 
-                Schedule.savePlayerSchedule(playerId, selectedTimes);
+                await Schedule.savePlayerSchedule(playerId, selectedTimes);
                 
                 // 延迟返回，让用户看到成功提示
                 setTimeout(() => {
@@ -248,10 +257,10 @@
             /**
              * 清空选择
              */
-            function clearSchedule() {
+            async function clearSchedule() {
                 if (Utils.confirm('确定要清空所有选择吗？')) {
-                    Schedule.savePlayerSchedule(playerId, []);
-                    renderSchedule();
+                    await Schedule.savePlayerSchedule(playerId, []);
+                    await renderSchedule();
                     Utils.showMessage('已清空选择', 'success');
                 }
             }

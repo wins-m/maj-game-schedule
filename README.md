@@ -25,18 +25,18 @@
 
 ## 技术栈
 
-### 基础方案（纯前端）
+### 当前版本（服务器端存储 - 推荐）
 - **前端框架**：原生 HTML + CSS + JavaScript
-- **数据存储**：LocalStorage（本地存储）或 IndexedDB
-- **UI框架**：可选 Bootstrap 或 Tailwind CSS
-- **图表库**：可选 Chart.js（用于积分统计）
+- **后端框架**：Node.js + Express
+- **数据存储**：JSON文件（存储在服务器端）
+- **部署方式**：Docker容器或Node.js套件
+- **优势**：支持多设备、多浏览器数据同步
 
-### 群晖NAS部署优化方案
-- **前端框架**：原生 HTML + CSS + JavaScript（保持纯前端，便于部署）
-- **数据存储**：
-  - **方案A（推荐）**：LocalStorage + 定期导出备份（适合单设备使用）
-  - **方案B**：添加轻量级后端（Node.js + SQLite/JSON文件）实现数据共享
-- **部署方式**：静态文件托管（Web Station）或 Docker容器
+### 旧版本（纯前端 - 已弃用）
+- **前端框架**：原生 HTML + CSS + JavaScript
+- **数据存储**：LocalStorage（本地存储）
+- **部署方式**：静态文件托管（Web Station）
+- **限制**：数据存储在浏览器本地，无法跨设备同步
 
 ## 项目结构
 
@@ -179,24 +179,38 @@ majgame/
 
 ### 部署方式选择
 
-#### 方案1：Web Station静态部署（推荐，最简单）
-**适用场景**：单用户或小范围使用，数据存储在浏览器LocalStorage
+#### 方案1：Docker部署（推荐）
+**适用场景**：多设备使用，需要数据同步
 
 **群晖套件安装要求**：
-1. **Web Station**（必需）
-   - 在套件中心搜索并安装 "Web Station"
-   - 这是群晖的Web服务器套件，用于托管静态网站
-   - 安装后会自动启用Apache或Nginx服务
+1. **Container Manager**（原Docker套件）
+   - 在套件中心搜索并安装 "Container Manager"
+   - 用于运行Docker容器
 
 **部署步骤**：
-1. 在群晖NAS中安装并启用 **Web Station**（如未安装）
-2. 打开 **Web Station**，创建虚拟主机：
-   - 主机名称：`majgame`（可自定义）
-   - 文档根目录：选择或创建文件夹（如 `/web/majgame/`）
-   - HTTP后端服务器：选择 Apache 或 Nginx（默认即可）
-3. 将项目所有文件上传到该文件夹（`/web/majgame/`）
-4. 通过 `http://nas-ip/majgame/` 或 `http://nas-ip:端口/majgame/` 访问
-5. （可选）配置HTTPS和域名，使用SSL证书
+1. 在群晖NAS中安装 **Container Manager**
+2. 将所有项目文件上传到NAS（如 `/docker/majgame/`）
+3. 在Container Manager中创建项目，使用项目目录中的 `docker-compose.yml`
+4. 启动容器后，通过 `http://nas-ip:3000` 访问
+5. （可选）配置反向代理和HTTPS
+
+详细步骤请参考 `DEPLOY-SERVER.md`
+
+#### 方案2：Node.js套件部署
+**适用场景**：不使用Docker，直接运行Node.js
+
+**群晖套件安装要求**：
+1. **Node.js v18** 套件
+   - 在套件中心搜索并安装 "Node.js v18"
+
+**部署步骤**：
+1. 安装Node.js套件
+2. 上传项目文件到 `/web/majgame/`
+3. 在server目录执行 `npm install`
+4. 使用PM2或forever管理进程
+5. 配置Web Station反向代理
+
+详细步骤请参考 `DEPLOY-SERVER.md`
 
 **优点**：
 - 部署简单，无需额外配置

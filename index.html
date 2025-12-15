@@ -20,20 +20,29 @@
         </header>
 
         <main>
-            <div id="round-info" class="round-info"></div>
+            <div id="loading-message" class="loading-message">
+                <p>正在加载数据...</p>
+            </div>
             
-            <div class="regroup-actions">
+            <div id="error-message" class="error-message" style="display: none;">
+                <p>加载失败，请检查服务器连接</p>
+                <button onclick="location.reload()" class="btn btn-primary">重新加载</button>
+            </div>
+            
+            <div id="round-info" class="round-info" style="display: none;"></div>
+            
+            <div class="regroup-actions" style="display: none;">
                 <button id="regroup-random-btn" class="btn btn-secondary">随机重新分组</button>
                 <button id="regroup-score-btn" class="btn btn-secondary">按积分重新分组</button>
             </div>
             
-            <div id="tables-container" class="tables-container">
+            <div id="tables-container" class="tables-container" style="display: none;">
                 <!-- 分桌表将在这里动态生成 -->
             </div>
         </main>
     </div>
 
-    <script src="js/storage.js"></script>
+    <script src="js/storage-api.js"></script>
     <script src="js/utils.js"></script>
     <script src="js/game.js"></script>
     <script src="js/schedule.js"></script>

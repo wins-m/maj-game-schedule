@@ -91,6 +91,8 @@ const Utils = {
      * @param {string} timeKey - 时间键，格式：YYYY-MM-DD_period 或 day_period（旧格式）
      */
     parseTimeKey(timeKey) {
+        if (!timeKey) return { dateStr: null, period: null };
+        
         const parts = timeKey.split('_');
         if (parts.length >= 2) {
             const firstPart = parts[0];
@@ -108,10 +110,12 @@ const Utils = {
                 if (dayInfo) {
                     return { dateStr: dayInfo.dateStr, period, day };
                 }
+                // 如果找不到对应的日期，返回原始值
+                return { dateStr: null, period, day };
             }
         }
-        // 兼容旧格式
-        return { day: parseInt(parts[0]), period: parts[1] || parts.slice(1).join('_') };
+        // 兼容旧格式或无效格式
+        return { dateStr: null, period: parts[1] || parts.slice(1).join('_'), day: parts[0] ? parseInt(parts[0]) : null };
     },
 
     /**
