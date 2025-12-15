@@ -50,6 +50,11 @@
                 return;
             }
 
+            // 跟踪是否有未保存的更改
+            let hasUnsavedChanges = false;
+            // 记录初始状态，用于比较
+            let initialSelectedTimes = [];
+
             // 初始化
             (async function() {
                 try {
@@ -71,6 +76,10 @@
 
                     // 渲染时间表
                     await renderSchedule();
+                    
+                    // 记录初始状态
+                    initialSelectedTimes = await Schedule.getSelectedTimes(playerId);
+                    hasUnsavedChanges = false;
                 } catch (error) {
                     console.error('初始化失败:', error);
                     alert('加载数据失败，请检查网络连接');
@@ -80,6 +89,25 @@
             // 绑定事件
             document.getElementById('save-schedule-btn').addEventListener('click', saveSchedule);
             document.getElementById('clear-schedule-btn').addEventListener('click', clearSchedule);
+            
+            // 绑定返回按钮，检查未保存更改
+            document.querySelector('a[href="index.html"]').addEventListener('click', function(e) {
+                if (hasUnsavedChanges) {
+                    e.preventDefault();
+                    if (Utils.confirm('您有未保存的更改，确定要离开吗？未保存的更改将丢失。')) {
+                        window.location.href = 'index.html';
+                    }
+                }
+            });
+            
+            // 绑定页面关闭事件，检查未保存更改
+            window.addEventListener('beforeunload', function(e) {
+                if (hasUnsavedChanges) {
+                    e.preventDefault();
+                    e.returnValue = '您有未保存的更改，确定要离开吗？';
+                    return e.returnValue;
+                }
+            });
 
             /**
              * 渲染时间表
@@ -134,6 +162,9 @@
                         // 直接使用返回值更新复选框状态，避免重复请求
                         const timeKey = Utils.getTimeKey(date, period);
                         this.checked = updatedTimes.includes(timeKey);
+                        
+                        // 标记有未保存的更改
+                        markAsUnsaved();
                     });
                 });
 
@@ -188,6 +219,9 @@
                     // 使用更新后的状态更新复选框，避免重复请求
                     updateCheckboxState(dateStr, period.key, selectedTimes);
                 }
+                
+                // 标记有未保存的更改
+                markAsUnsaved();
             }
 
             /**
@@ -218,6 +252,9 @@
                     // 使用更新后的状态更新复选框，避免重复请求
                     updateCheckboxState(day.dateStr, period, selectedTimes);
                 }
+                
+                // 标记有未保存的更改
+                markAsUnsaved();
             }
 
             /**
@@ -230,6 +267,62 @@
                 if (checkbox) {
                     const timeKey = Utils.getTimeKey(dateStr, period);
                     checkbox.checked = selectedTimes.includes(timeKey);
+                }
+            }
+
+            /**
+             * 标记有未保存的更改
+             */
+            function markAsUnsaved() {
+                // 获取当前选择状态
+                const currentSelectedTimes = [];
+                document.querySelectorAll('.time-checkbox input:checked').forEach(checkbox => {
+                    const date = checkbox.dataset.date;
+                    const period = checkbox.dataset.period;
+                    currentSelectedTimes.push(Utils.getTimeKey(date, period));
+                });
+                
+                // 比较当前状态和初始状态
+                const currentSorted = [...currentSelectedTimes].sort().join(',');
+                const initialSorted = [...initialSelectedTimes].sort().join(',');
+                hasUnsavedChanges = currentSorted !== initialSorted;
+            }
+
+            /**
+             * 生成所有选手空闲时间的备份文件（保存到服务器）
+             */
+            async function generateBackupFile() {
+                try {
+                    const players = await Storage.getPlayers();
+                    const schedules = await Storage.getSchedules();
+                    
+                    // 构建备份数据
+                    const backupData = {
+                        exportTime: new Date().toISOString(),
+                        players: players.map(player => ({
+                            id: player.id,
+                            name: player.name
+                        })),
+                        schedules: schedules.map(schedule => ({
+                            playerId: schedule.playerId,
+                            playerName: players.find(p => p.id === schedule.playerId)?.name || `选手${schedule.playerId}`,
+                            availableTimes: schedule.availableTimes || [],
+                            updatedAt: schedule.updatedAt
+                        }))
+                    };
+                    
+                    // 调用服务器API保存备份文件
+                    const result = await Storage.apiRequest('/backup-schedule', 'POST', backupData);
+                    
+                    if (result.success) {
+                        console.log('备份文件已保存到服务器:', result.filename);
+                        Utils.showMessage(`备份文件已保存: ${result.filename}`, 'success');
+                    } else {
+                        throw new Error('服务器返回失败');
+                    }
+                } catch (error) {
+                    console.error('保存备份文件失败:', error);
+                    Utils.showMessage('保存备份文件失败，请检查服务器连接', 'error');
                 }
             }
 
@@ -247,6 +340,13 @@
                 
                 await Schedule.savePlayerSchedule(playerId, selectedTimes);
                 
+                // 生成备份文件
+                await generateBackupFile();
+                
+                // 清除未保存标记
+                hasUnsavedChanges = false;
+                initialSelectedTimes = selectedTimes;
+                
                 // 延迟返回，让用户看到成功提示
                 setTimeout(() => {
                     window.location.href = 'index.html';
@@ -260,6 +360,11 @@
                 if (Utils.confirm('确定要清空所有选择吗？')) {
                     await Schedule.savePlayerSchedule(playerId, []);
                     await renderSchedule();
+                    
+                    // 更新初始状态
+                    initialSelectedTimes = [];
+                    hasUnsavedChanges = false;
+                    
                     Utils.showMessage('已清空选择', 'success');
                 }
             }

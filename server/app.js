@@ -16,12 +16,6 @@ const DATA_DIR = path.join(__dirname, 'data');
 app.use(cors());
 app.use(express.json());
 
-// API路由（必须在静态文件服务之前）
-// 注意：所有API路由都在这里定义
-
-// 静态文件服务（放在最后，作为fallback）
-app.use(express.static(path.join(__dirname, '../')));
-
 // 确保数据目录存在
 async function ensureDataDir() {
     try {
@@ -207,6 +201,48 @@ app.post('/api/reset', async (req, res) => {
         res.status(500).json({ error: '重置数据失败' });
     }
 });
+
+// 保存时间表备份文件
+app.post('/api/backup-schedule', async (req, res) => {
+    try {
+        const backupData = req.body;
+        
+        // 确保数据目录存在
+        await ensureDataDir();
+        
+        // 生成文件名：时间表备份_YYYY-MM-DD_HH-mm-ss.json
+        const now = new Date();
+        const year = now.getFullYear();
+        const month = String(now.getMonth() + 1).padStart(2, '0');
+        const day = String(now.getDate()).padStart(2, '0');
+        const hours = String(now.getHours()).padStart(2, '0');
+        const minutes = String(now.getMinutes()).padStart(2, '0');
+        const seconds = String(now.getSeconds()).padStart(2, '0');
+        
+        const filename = `schedule-backup_${year}-${month}-${day}_${hours}-${minutes}-${seconds}.json`;
+        const filePath = path.join(DATA_DIR, filename);
+        
+        // 保存备份文件
+        await fs.writeFile(filePath, JSON.stringify(backupData, null, 2), 'utf8');
+        
+        console.log(`时间表备份已保存: ${filename}`);
+        res.json({ 
+            success: true, 
+            filename: filename,
+            message: '备份文件已保存到服务器'
+        });
+    } catch (error) {
+        console.error('保存备份文件失败:', error);
+        res.status(500).json({ 
+            success: false,
+            error: '保存备份文件失败',
+            details: error.message 
+        });
+    }
+});
+
+// 静态文件服务（放在最后，作为fallback）
+app.use(express.static(path.join(__dirname, '../')));
 
 // 启动服务器
 async function startServer() {
