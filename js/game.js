@@ -81,6 +81,7 @@ const Game = {
 
     /**
      * 按积分分组（积分相同时随机）
+     * 积分高的4人一组，只有并列的人才随机分配
      * @param {Array} players - 选手数组
      * @param {number} playersPerTable - 每桌人数，默认4
      * @param {number} tables - 桌数，默认2
@@ -96,7 +97,7 @@ const Game = {
             groupedByScore[score].push(player);
         });
         
-        // 对每个积分组内的选手随机排序
+        // 对每个积分组内的选手随机排序（只有并列的人才随机分配）
         Object.keys(groupedByScore).forEach(score => {
             groupedByScore[score].sort(() => Math.random() - 0.5);
         });
@@ -108,19 +109,13 @@ const Game = {
         
         const tableArrangement = [];
         
-        // 蛇形分组
+        // 直接分组：前4名一桌，后4名一桌（积分高的4人一组）
         for (let tableIndex = 0; tableIndex < tables; tableIndex++) {
             const tablePlayers = [];
+            const startIndex = tableIndex * playersPerTable;
             
-            for (let round = 0; round < playersPerTable; round++) {
-                let playerIndex;
-                if (round % 2 === 0) {
-                    playerIndex = tableIndex + round * tables;
-                } else {
-                    const reverseIndex = tables - 1 - tableIndex;
-                    playerIndex = reverseIndex + round * tables;
-                }
-                
+            for (let i = 0; i < playersPerTable; i++) {
+                const playerIndex = startIndex + i;
                 if (playerIndex < sortedPlayers.length) {
                     tablePlayers.push(sortedPlayers[playerIndex].id);
                 }
@@ -272,18 +267,22 @@ const Game = {
         }
         
         // 转换为可读格式并排序
+        const future7Days = Utils.getNextDays(7);
         return commonTimes.map(timeKey => {
-            const { day, period } = Utils.parseTimeKey(timeKey);
+            const { dateStr, period } = Utils.parseTimeKey(timeKey);
+            const dayInfo = future7Days.find(d => d.dateStr === dateStr);
             return {
                 timeKey,
-                day,
+                dateStr,
                 period,
-                dayName: Utils.getNextDays()[day - 1]?.weekday || '',
+                dayName: dayInfo?.weekday || '',
                 periodName: Utils.getPeriodName(period),
-                display: `第${day}天${Utils.getPeriodName(period)}`
+                display: dateStr ? `${dateStr} ${Utils.getPeriodName(period)}` : timeKey
             };
         }).sort((a, b) => {
-            if (a.day !== b.day) return a.day - b.day;
+            if (a.dateStr !== b.dateStr) {
+                return a.dateStr.localeCompare(b.dateStr);
+            }
             const periodOrder = { morning: 1, afternoon: 2, evening: 3 };
             return periodOrder[a.period] - periodOrder[b.period];
         });

@@ -89,19 +89,19 @@
 
                 days.forEach(day => {
                     html += `<tr>
-                        <td class="day-cell batch-select-row" data-day="${day.day}">
+                        <td class="day-cell batch-select-row" data-date="${day.dateStr}">
                             <div class="day-name">${day.dateStr}</div>
                             <div class="weekday">星期${day.weekday}</div>
                         </td>`;
                     
                     periods.forEach(period => {
-                        const timeKey = Utils.getTimeKey(day.day, period.key);
+                        const timeKey = Utils.getTimeKey(day.dateStr, period.key);
                         const isSelected = selectedTimes.includes(timeKey);
                         html += `
                             <td class="time-cell">
                                 <label class="time-checkbox">
                                     <input type="checkbox" 
-                                           data-day="${day.day}" 
+                                           data-date="${day.dateStr}" 
                                            data-period="${period.key}"
                                            ${isSelected ? 'checked' : ''}>
                                     <span class="checkmark"></span>
@@ -120,11 +120,11 @@
                 // 绑定复选框事件
                 document.querySelectorAll('.time-checkbox input').forEach(checkbox => {
                     checkbox.addEventListener('change', function() {
-                        const day = parseInt(this.dataset.day);
+                        const date = this.dataset.date;
                         const period = this.dataset.period;
-                        Schedule.toggleTimeSlot(playerId, day, period);
+                        Schedule.toggleTimeSlot(playerId, date, period);
                         // 更新显示
-                        updateCheckboxState(day, period);
+                        updateCheckboxState(date, period);
                     });
                 });
 
@@ -134,8 +134,11 @@
                         // 如果点击的是复选框，不触发整行选择
                         if (e.target.closest('.time-checkbox')) return;
                         
-                        const day = parseInt(this.dataset.day);
-                        toggleRow(day);
+                        const dateStr = this.dataset.date || 
+                            this.querySelector('.day-name')?.textContent;
+                        if (dateStr) {
+                            toggleRow(dateStr);
+                        }
                     });
                 });
 
@@ -151,30 +154,30 @@
             /**
              * 切换整行选择
              */
-            function toggleRow(day) {
+            function toggleRow(dateStr) {
                 const periods = Utils.getPeriods();
                 let selectedTimes = Schedule.getSelectedTimes(playerId);
                 
                 // 检查该行是否全部选中
-                const rowTimes = periods.map(p => Utils.getTimeKey(day, p.key));
+                const rowTimes = periods.map(p => Utils.getTimeKey(dateStr, p.key));
                 const allSelected = rowTimes.every(timeKey => selectedTimes.includes(timeKey));
                 
                 periods.forEach(period => {
-                    const timeKey = Utils.getTimeKey(day, period.key);
+                    const timeKey = Utils.getTimeKey(dateStr, period.key);
                     if (allSelected) {
                         // 全部取消
                         if (selectedTimes.includes(timeKey)) {
-                            Schedule.toggleTimeSlot(playerId, day, period.key);
+                            Schedule.toggleTimeSlot(playerId, dateStr, period.key);
                             selectedTimes = Schedule.getSelectedTimes(playerId); // 更新状态
                         }
                     } else {
                         // 全部选中
                         if (!selectedTimes.includes(timeKey)) {
-                            Schedule.toggleTimeSlot(playerId, day, period.key);
+                            Schedule.toggleTimeSlot(playerId, dateStr, period.key);
                             selectedTimes = Schedule.getSelectedTimes(playerId); // 更新状态
                         }
                     }
-                    updateCheckboxState(day, period.key);
+                    updateCheckboxState(dateStr, period.key);
                 });
             }
 
@@ -186,38 +189,38 @@
                 let selectedTimes = Schedule.getSelectedTimes(playerId);
                 
                 // 检查该列是否全部选中
-                const columnTimes = days.map(d => Utils.getTimeKey(d.day, period));
+                const columnTimes = days.map(d => Utils.getTimeKey(d.dateStr, period));
                 const allSelected = columnTimes.every(timeKey => selectedTimes.includes(timeKey));
                 
                 days.forEach(day => {
-                    const timeKey = Utils.getTimeKey(day.day, period);
+                    const timeKey = Utils.getTimeKey(day.dateStr, period);
                     if (allSelected) {
                         // 全部取消
                         if (selectedTimes.includes(timeKey)) {
-                            Schedule.toggleTimeSlot(playerId, day.day, period);
+                            Schedule.toggleTimeSlot(playerId, day.dateStr, period);
                             selectedTimes = Schedule.getSelectedTimes(playerId); // 更新状态
                         }
                     } else {
                         // 全部选中
                         if (!selectedTimes.includes(timeKey)) {
-                            Schedule.toggleTimeSlot(playerId, day.day, period);
+                            Schedule.toggleTimeSlot(playerId, day.dateStr, period);
                             selectedTimes = Schedule.getSelectedTimes(playerId); // 更新状态
                         }
                     }
-                    updateCheckboxState(day.day, period);
+                    updateCheckboxState(day.dateStr, period);
                 });
             }
 
             /**
              * 更新复选框状态显示
              */
-            function updateCheckboxState(day, period) {
+            function updateCheckboxState(dateStr, period) {
                 const checkbox = document.querySelector(
-                    `input[data-day="${day}"][data-period="${period}"]`
+                    `input[data-date="${dateStr}"][data-period="${period}"]`
                 );
                 if (checkbox) {
                     const selectedTimes = Schedule.getSelectedTimes(playerId);
-                    const timeKey = Utils.getTimeKey(day, period);
+                    const timeKey = Utils.getTimeKey(dateStr, period);
                     checkbox.checked = selectedTimes.includes(timeKey);
                 }
             }
@@ -229,9 +232,9 @@
                 // 从所有checkbox获取当前选择状态
                 const selectedTimes = [];
                 document.querySelectorAll('.time-checkbox input:checked').forEach(checkbox => {
-                    const day = parseInt(checkbox.dataset.day);
+                    const date = checkbox.dataset.date;
                     const period = checkbox.dataset.period;
-                    selectedTimes.push(Utils.getTimeKey(day, period));
+                    selectedTimes.push(Utils.getTimeKey(date, period));
                 });
                 
                 Schedule.savePlayerSchedule(playerId, selectedTimes);

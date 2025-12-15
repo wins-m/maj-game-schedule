@@ -17,6 +17,22 @@ const Schedule = {
                 availableTimes: [],
                 updatedAt: new Date().toISOString()
             };
+        } else if (schedule.availableTimes && schedule.availableTimes.length > 0) {
+            // 迁移旧格式的时间键到新格式（使用实际日期）
+            const migrated = Utils.migrateTimeKeys(schedule.availableTimes);
+            // 过滤掉已过期的日期（只保留未来7天内的）
+            const today = new Date();
+            const future7Days = Utils.getNextDays(7).map(d => d.dateStr);
+            schedule.availableTimes = migrated.filter(timeKey => {
+                const { dateStr } = Utils.parseTimeKey(timeKey);
+                return dateStr && future7Days.includes(dateStr);
+            });
+            
+            // 如果有变化，保存迁移后的数据
+            if (migrated.length !== schedule.availableTimes.length || 
+                JSON.stringify(migrated) !== JSON.stringify(schedule.availableTimes)) {
+                Storage.saveSchedule(schedule);
+            }
         }
         
         return schedule;
@@ -48,13 +64,13 @@ const Schedule = {
     /**
      * 切换时间段的选择状态
      * @param {number} playerId - 选手ID
-     * @param {number} day - 天数（1-7）
+     * @param {string|number} dateOrDay - 日期字符串(YYYY-MM-DD)或相对天数(1-7)
      * @param {string} period - 时段（morning/afternoon/evening）
      * @param {boolean} autoSave - 是否自动保存，默认false
      */
-    toggleTimeSlot(playerId, day, period, autoSave = false) {
+    toggleTimeSlot(playerId, dateOrDay, period, autoSave = false) {
         const schedule = this.getPlayerSchedule(playerId);
-        const timeKey = Utils.getTimeKey(day, period);
+        const timeKey = Utils.getTimeKey(dateOrDay, period);
         const index = schedule.availableTimes.indexOf(timeKey);
         
         if (index > -1) {
@@ -79,12 +95,12 @@ const Schedule = {
     /**
      * 检查时间段是否被选中
      * @param {number} playerId - 选手ID
-     * @param {number} day - 天数
+     * @param {string|number} dateOrDay - 日期字符串(YYYY-MM-DD)或相对天数(1-7)
      * @param {string} period - 时段
      */
-    isTimeSlotSelected(playerId, day, period) {
+    isTimeSlotSelected(playerId, dateOrDay, period) {
         const schedule = this.getPlayerSchedule(playerId);
-        const timeKey = Utils.getTimeKey(day, period);
+        const timeKey = Utils.getTimeKey(dateOrDay, period);
         return schedule.availableTimes.includes(timeKey);
     },
 
