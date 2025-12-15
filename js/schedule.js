@@ -51,8 +51,9 @@ const Schedule = {
         // 更新选手的填表状态
         await Storage.updatePlayer(playerId, { hasFilledSchedule: true });
         
-        // 更新共同空闲时间
-        await Game.updateAllCommonTimes();
+        if(typeof Game !== "undefined")
+            // 更新共同空闲时间
+            await Game.updateAllCommonTimes();
         
         Utils.showMessage('时间表已保存', 'success');
     },

@@ -124,144 +124,86 @@
 
                 document.getElementById('schedule-table').innerHTML = html;
 
-                // 绑定复选框事件
-                document.querySelectorAll('.time-checkbox input').forEach(checkbox => {
-                    checkbox.addEventListener('change', async function() {
-                        const date = this.dataset.date;
-                        const period = this.dataset.period;
-                        await Schedule.toggleTimeSlot(playerId, date, period);
-                        // 更新显示
-                        await updateCheckboxState(date, period);
-                    });
-                });
-
                 // 绑定整行选择（点击日期单元格）
                 document.querySelectorAll('.batch-select-row').forEach(cell => {
-                    cell.addEventListener('click', async function(e) {
+                    cell.addEventListener('click', function(e) {
                         // 如果点击的是复选框，不触发整行选择
                         if (e.target.closest('.time-checkbox')) return;
                         
                         const dateStr = this.dataset.date || 
                             this.querySelector('.day-name')?.textContent;
                         if (dateStr) {
-                            await toggleRow(dateStr);
+                            toggleRow(dateStr);
                         }
                     });
                 });
 
                 // 绑定整列选择（点击时段表头）
                 document.querySelectorAll('.period-header').forEach(header => {
-                    header.addEventListener('click', async function() {
+                    header.addEventListener('click', function() {
                         const period = this.dataset.period;
-                        await toggleColumn(period);
+                        toggleColumn(period);
                     });
                 });
             }
 
             /**
-             * 切换整行选择
+             * 切换整行选择 (纯前端 DOM 操作)
              */
-            async function toggleRow(dateStr) {
-                const periods = Utils.getPeriods();
-                let selectedTimes = await Schedule.getSelectedTimes(playerId);
-                
-                // 检查该行是否全部选中
-                const rowTimes = periods.map(p => Utils.getTimeKey(dateStr, p.key));
-                const allSelected = rowTimes.every(timeKey => selectedTimes.includes(timeKey));
-                
-                // 使用for...of循环替代forEach，以支持await
-                for (const period of periods) {
-                    const timeKey = Utils.getTimeKey(dateStr, period.key);
-                    if (allSelected) {
-                        // 全部取消
-                        if (selectedTimes.includes(timeKey)) {
-                            await Schedule.toggleTimeSlot(playerId, dateStr, period.key);
-                            selectedTimes = await Schedule.getSelectedTimes(playerId); // 更新状态
-                        }
-                    } else {
-                        // 全部选中
-                        if (!selectedTimes.includes(timeKey)) {
-                            await Schedule.toggleTimeSlot(playerId, dateStr, period.key);
-                            selectedTimes = await Schedule.getSelectedTimes(playerId); // 更新状态
-                        }
-                    }
-                    await updateCheckboxState(dateStr, period.key);
-                }
+            function toggleRow(dateStr) {
+                const checkboxes = document.querySelectorAll(`input[data-date="${dateStr}"]`);
+                const checkboxArr = Array.from(checkboxes);
+                const allChecked = checkboxArr.every(cb => cb.checked);
+                checkboxArr.forEach(cb => cb.checked = !allChecked);
             }
 
             /**
-             * 切换整列选择
+             * 切换整列选择 (纯前端 DOM 操作)
              */
-            async function toggleColumn(period) {
-                const days = Utils.getNextDays(7);
-                let selectedTimes = await Schedule.getSelectedTimes(playerId);
-                
-                // 检查该列是否全部选中
-                const columnTimes = days.map(d => Utils.getTimeKey(d.dateStr, period));
-                const allSelected = columnTimes.every(timeKey => selectedTimes.includes(timeKey));
-                
-                // 使用for...of循环替代forEach，以支持await
-                for (const day of days) {
-                    const timeKey = Utils.getTimeKey(day.dateStr, period);
-                    if (allSelected) {
-                        // 全部取消
-                        if (selectedTimes.includes(timeKey)) {
-                            await Schedule.toggleTimeSlot(playerId, day.dateStr, period);
-                            selectedTimes = await Schedule.getSelectedTimes(playerId); // 更新状态
-                        }
-                    } else {
-                        // 全部选中
-                        if (!selectedTimes.includes(timeKey)) {
-                            await Schedule.toggleTimeSlot(playerId, day.dateStr, period);
-                            selectedTimes = await Schedule.getSelectedTimes(playerId); // 更新状态
-                        }
-                    }
-                    await updateCheckboxState(day.dateStr, period);
-                }
-            }
-
-            /**
-             * 更新复选框状态显示
-             */
-            async function updateCheckboxState(dateStr, period) {
-                const checkbox = document.querySelector(
-                    `input[data-date="${dateStr}"][data-period="${period}"]`
-                );
-                if (checkbox) {
-                    const selectedTimes = await Schedule.getSelectedTimes(playerId);
-                    const timeKey = Utils.getTimeKey(dateStr, period);
-                    checkbox.checked = selectedTimes.includes(timeKey);
-                }
+            function toggleColumn(period) {
+                const checkboxes = document.querySelectorAll(`input[data-period="${period}"]`);
+                const checkboxArr = Array.from(checkboxes);
+                const allChecked = checkboxArr.every(cb => cb.checked);
+                checkboxArr.forEach(cb => cb.checked = !allChecked);
             }
 
             /**
              * 保存时间表
              */
             async function saveSchedule() {
-                // 从所有checkbox获取当前选择状态
-                const selectedTimes = [];
-                document.querySelectorAll('.time-checkbox input:checked').forEach(checkbox => {
-                    const date = checkbox.dataset.date;
-                    const period = checkbox.dataset.period;
-                    selectedTimes.push(Utils.getTimeKey(date, period));
-                });
-                
-                await Schedule.savePlayerSchedule(playerId, selectedTimes);
-                
-                // 延迟返回，让用户看到成功提示
-                setTimeout(() => {
-                    window.location.href = 'index.html';
-                }, 1000);
+                const saveBtn = document.getElementById('save-schedule-btn');
+                saveBtn.disabled = true;
+                saveBtn.textContent = '保存中...';
+
+                try {
+                    // 从所有checkbox获取当前选择状态
+                    const selectedTimes = [];
+                    document.querySelectorAll('.time-checkbox input:checked').forEach(checkbox => {
+                        const date = checkbox.dataset.date;
+                        const period = checkbox.dataset.period;
+                        selectedTimes.push(Utils.getTimeKey(date, period));
+                    });
+                    
+                    await Schedule.savePlayerSchedule(playerId, selectedTimes);
+                    
+                    Utils.showMessage('保存成功！', 'success');
+                    setTimeout(() => {
+                        window.location.href = 'index.html';
+                    }, 1000);
+                } catch (e) {
+                    console.error(e);
+                    Utils.showMessage('保存失败', 'error');
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = '保存时间表';
+                }
             }
 
             /**
              * 清空选择
              */
-            async function clearSchedule() {
-                if (Utils.confirm('确定要清空所有选择吗？')) {
-                    await Schedule.savePlayerSchedule(playerId, []);
-                    await renderSchedule();
-                    Utils.showMessage('已清空选择', 'success');
+            function clearSchedule() {
+                if (confirm('确定要清空当前页面的选择吗？(需要点击保存才生效)')) {
+                    document.querySelectorAll('.time-checkbox input').forEach(cb => cb.checked = false);
                 }
             }
         })();
