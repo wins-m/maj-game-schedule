@@ -143,7 +143,7 @@ const App = {
                                         ✏️
                                     </button>
                                 </div>
-                                <span class="player-score">积分: ${player.totalScore}</span>
+                                <span class="player-score">积分: ${player.totalScore.toFixed(1)}</span>
                                 <span class="fill-status ${player.hasFilledSchedule ? 'filled' : 'unfilled'}">
                                     ${player.hasFilledSchedule ? '✓ 已填表' : '○ 未填表'}
                                 </span>
@@ -260,15 +260,21 @@ const App = {
                 <form id="score-form">
                     ${players.map(player => `
                         <div class="score-input-group">
-                            <label>${player.name}（当前积分：${player.totalScore}）</label>
-                            <input type="number" 
-                                   name="player_${player.id}" 
-                                   value="0" 
-                                   min="0" 
-                                   step="1"
+                            <label>${player.name}（当前积分：${player.totalScore.toFixed(1)}）</label>
+                            <input type="number"
+                                   name="player_${player.id}"
+                                   value="0"
+                                   step="0.1"
+                                   placeholder="支持1位小数，如：-5.5"
                                    required>
                         </div>
                     `).join('')}
+                    <div class="score-input-group">
+                        <label>
+                            <input type="checkbox" name="advance_round">
+                            录入后进入下一场次（不勾选则保持当前场次）
+                        </label>
+                    </div>
                     <div class="modal-actions">
                         <button type="submit" class="btn btn-primary">保存</button>
                         <button type="button" class="btn btn-secondary" id="cancel-score-btn">取消</button>
@@ -297,13 +303,41 @@ const App = {
         const form = document.getElementById('score-form');
         const formData = new FormData(form);
         const scores = {};
-        
+        let advanceRound = false;
+        let hasValidationError = false;
+
         formData.forEach((value, key) => {
-            const playerId = parseInt(key.replace('player_', ''));
-            scores[playerId] = parseInt(value) || 0;
+            if (hasValidationError) return;
+
+            if (key === 'advance_round') {
+                advanceRound = value === 'on';
+            } else {
+                const playerId = parseInt(key.replace('player_', ''));
+                const scoreValue = parseFloat(value);
+
+                // 验证小数位数（最多1位小数）
+                if (isNaN(scoreValue)) {
+                    Utils.showMessage(`选手ID ${playerId} 的分数格式不正确`, 'error');
+                    hasValidationError = true;
+                    return;
+                }
+
+                // 检查小数位数
+                if (value.includes('.') && value.split('.')[1].length > 1) {
+                    Utils.showMessage(`选手ID ${playerId} 的分数最多只能有1位小数`, 'error');
+                    hasValidationError = true;
+                    return;
+                }
+
+                scores[playerId] = scoreValue;
+            }
         });
-        
-        if (await Game.completeRound(scores)) {
+
+        if (hasValidationError) {
+            return;
+        }
+
+        if (await Game.completeRound(scores, advanceRound)) {
             dialog.remove();
             await this.renderMainPage();
         }

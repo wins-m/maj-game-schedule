@@ -191,8 +191,9 @@ const Game = {
     /**
      * 完成当前场次并录入积分
      * @param {Object} scores - 积分对象 { playerId: score }
+     * @param {boolean} advanceRound - 是否进入下一场次，默认true
      */
-    async completeRound(scores) {
+    async completeRound(scores, advanceRound = true) {
         const currentRound = await Storage.getCurrentRound();
         const game = await Storage.getGame(currentRound);
         
@@ -207,23 +208,31 @@ const Game = {
             const score = scores[player.id] || 0;
             player.scores.push(score);
             player.totalScore += score;
-            // 重置时间表填写状态
-            player.hasFilledSchedule = false;
+            // 只有进入下一场次时才重置时间表填写状态
+            if (advanceRound) {
+                player.hasFilledSchedule = false;
+            }
         });
         await Storage.savePlayers(players);
-        
-        // 标记当前场次为已完成
-        game.isCompleted = true;
-        await Storage.saveGame(game);
-        
-        // 创建下一场次
-        const nextRound = currentRound + 1;
-        if (nextRound <= 6) { // 默认6场
-            await Storage.setCurrentRound(nextRound);
-            await this.createGame(nextRound);
-            Utils.showMessage(`第${currentRound}场已完成，已生成第${nextRound}场分桌`, 'success');
+
+        // 只有进入下一场次时才标记当前场次为已完成
+        if (advanceRound) {
+            game.isCompleted = true;
+            await Storage.saveGame(game);
+        }
+
+        if (advanceRound) {
+            // 创建下一场次
+            const nextRound = currentRound + 1;
+            if (nextRound <= 6) { // 默认6场
+                await Storage.setCurrentRound(nextRound);
+                await this.createGame(nextRound);
+                Utils.showMessage(`第${currentRound}场已完成，已生成第${nextRound}场分桌`, 'success');
+            } else {
+                Utils.showMessage('所有比赛场次已完成！', 'success');
+            }
         } else {
-            Utils.showMessage('所有比赛场次已完成！', 'success');
+            Utils.showMessage(`第${currentRound}场积分已录入，场次保持不变`, 'success');
         }
         
         return true;
