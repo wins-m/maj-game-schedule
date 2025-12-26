@@ -135,23 +135,15 @@ const Storage = {
     },
 
     async saveGame(game) {
-        try {
-            // 使用新的单个游戏保存API，避免并发冲突
-            await this.apiRequest(`/game/${game.round}`, 'POST', game);
-            return true;
-        } catch (error) {
-            console.error('保存单个游戏失败，回退到批量保存:', error);
-            // 如果新API失败，回退到原来的批量保存方式
-            const games = await this.getGames();
-            const index = games.findIndex(g => g.round === game.round);
-            if (index !== -1) {
-                games[index] = game;
-            } else {
-                games.push(game);
-            }
-            await this.saveGames(games);
-            return true;
+        // 直接使用批量保存方式，避免单个游戏API的路由问题
+        const games = await this.getGames();
+        const index = games.findIndex(g => g.round === game.round);
+        if (index !== -1) {
+            games[index] = game;
+        } else {
+            games.push(game);
         }
+        return await this.saveGames(games);
     },
 
     /**
