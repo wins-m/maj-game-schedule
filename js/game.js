@@ -154,6 +154,13 @@ const Game = {
             isCompleted: false,
             createdAt: new Date().toISOString()
         };
+
+        // 为向后兼容，初始化新字段的默认值
+        game.tables.forEach(table => {
+            if (!table.scores) table.scores = {};
+            if (!table.ratings) table.ratings = {};
+            if (!table.recordUrl) table.recordUrl = '';
+        });
         
         await Storage.saveGame(game);
         return game;
@@ -182,6 +189,14 @@ const Game = {
         }
         
         game.tables = tables;
+
+        // 为新分组的桌子初始化新字段的默认值
+        game.tables.forEach(table => {
+            if (!table.scores) table.scores = {};
+            if (!table.ratings) table.ratings = {};
+            if (!table.recordUrl) table.recordUrl = '';
+        });
+
         await Storage.saveGame(game);
         
         Utils.showMessage(`已${method === 'random' ? '随机' : '按积分'}重新分组`, 'success');
@@ -191,17 +206,21 @@ const Game = {
     /**
      * 完成当前场次并录入积分
      * @param {Object} scores - 积分对象 { playerId: score }
-     * @param {boolean} advanceRound - 是否进入下一场次，默认true
+     * @param {Object} options - 选项对象
+     * @param {Object} options.ratings - 评分对象 { tableId: { playerId: rating } }
+     * @param {Object} options.recordUrls - 牌谱网址对象 { tableId: url }
+     * @param {boolean} options.advanceRound - 是否进入下一场次，默认true
      */
-    async completeRound(scores, advanceRound = true) {
+    async completeRound(scores, options = {}) {
+        const { ratings = {}, recordUrls = {}, advanceRound = true } = options;
         const currentRound = await Storage.getCurrentRound();
         const game = await Storage.getGame(currentRound);
-        
+
         if (!game) {
             Utils.showMessage('当前场次不存在', 'error');
             return false;
         }
-        
+
         // 更新选手积分
         const players = await Storage.getPlayers();
         players.forEach(player => {
@@ -215,11 +234,26 @@ const Game = {
         });
         await Storage.savePlayers(players);
 
+        // 更新桌级别的评分和牌谱网址
+        game.tables.forEach(table => {
+            table.scores = {};
+            table.ratings = {};
+            table.recordUrl = recordUrls[table.tableId] || '';
+
+            // 为该桌的每个玩家设置积分和评分
+            table.players.forEach(playerId => {
+                table.scores[playerId] = scores[playerId] || 0;
+                table.ratings[playerId] = (ratings[table.tableId] && ratings[table.tableId][playerId]) || '';
+            });
+        });
+
         // 只有进入下一场次时才标记当前场次为已完成
         if (advanceRound) {
             game.isCompleted = true;
-            await Storage.saveGame(game);
         }
+
+        // 保存更新后的游戏数据
+        await Storage.saveGame(game);
 
         if (advanceRound) {
             // 创建下一场次
@@ -243,7 +277,8 @@ const Game = {
      */
     async getCurrentGame() {
         const currentRound = await Storage.getCurrentRound();
-        return await Storage.getGame(currentRound);
+        const game = await Storage.getGame(currentRound);
+        return game ? this.migrateGameData(game) : null;
     },
 
     /**
@@ -303,12 +338,51 @@ const Game = {
     async updateAllCommonTimes() {
         const game = await this.getCurrentGame();
         if (!game) return;
-        
+
         for (const table of game.tables) {
             table.commonTimes = await this.calculateCommonTimes(table.players);
         }
-        
+
         await Storage.saveGame(game);
+    },
+
+    /**
+     * 迁移旧游戏数据，确保向后兼容
+     * 为没有新字段的旧数据添加默认值
+     */
+    migrateGameData(game) {
+        if (!game || !game.tables) return game;
+
+        game.tables.forEach(table => {
+            // 初始化积分对象
+            if (!table.scores) {
+                table.scores = {};
+                // 如果有玩家但没有积分记录，为每个玩家设置默认积分0
+                if (table.players && table.players.length > 0) {
+                    table.players.forEach(playerId => {
+                        table.scores[playerId] = 0;
+                    });
+                }
+            }
+
+            // 初始化评分对象
+            if (!table.ratings) {
+                table.ratings = {};
+                // 如果有玩家但没有评分记录，为每个玩家设置默认空字符串
+                if (table.players && table.players.length > 0) {
+                    table.players.forEach(playerId => {
+                        table.ratings[playerId] = '';
+                    });
+                }
+            }
+
+            // 初始化牌谱网址
+            if (!table.recordUrl) {
+                table.recordUrl = '';
+            }
+        });
+
+        return game;
     }
 };
 

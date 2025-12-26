@@ -247,31 +247,67 @@ const App = {
             Utils.showMessage('当前场次已完成或不存在', 'error');
             return;
         }
-        
+
         const players = await Storage.getPlayers();
         const currentRound = await Storage.getCurrentRound();
-        
+
         // 创建对话框
         const dialog = document.createElement('div');
         dialog.className = 'modal-overlay';
         dialog.innerHTML = `
-            <div class="modal-content">
+            <div class="modal-content score-dialog">
                 <h3>录入第 ${currentRound} 场积分</h3>
                 <form id="score-form">
-                    ${players.map(player => `
-                        <div class="score-input-group">
-                            <label>${player.name}（当前积分：${player.totalScore.toFixed(1)}）</label>
-                            <input type="number"
-                                   name="player_${player.id}"
-                                   value="0"
-                                   step="0.1"
-                                   placeholder="支持1位小数，如：-5.5"
-                                   required>
-                        </div>
-                    `).join('')}
-                    <div class="score-input-group">
+                    ${game.tables.map(table => {
+                        const tablePlayers = table.players.map(id => {
+                            const player = players.find(p => p.id === id);
+                            return player;
+                        });
+
+                        return `
+                            <div class="table-score-section">
+                                <h4>第 ${table.tableId} 桌</h4>
+                                <div class="table-players">
+                                    ${tablePlayers.map(player => `
+                                        <div class="player-score-input">
+                                            <div class="player-info">
+                                                <span class="player-name">${player.name}</span>
+                                                <span class="current-score">当前积分: ${player.totalScore.toFixed(1)}</span>
+                                            </div>
+                                            <div class="input-group">
+                                                <label>积分:</label>
+                                                <input type="number"
+                                                       name="score_${table.tableId}_${player.id}"
+                                                       value="${table.scores ? (table.scores[player.id] || 0) : 0}"
+                                                       step="0.1"
+                                                       placeholder="-5.5"
+                                                       required>
+                                            </div>
+                                            <div class="input-group">
+                                                <label>评分:</label>
+                                                <input type="text"
+                                                       name="rating_${table.tableId}_${player.id}"
+                                                       value="${table.ratings ? (table.ratings[player.id] || '') : ''}"
+                                                       placeholder="可选"
+                                                       maxlength="50">
+                                            </div>
+                                        </div>
+                                    `).join('')}
+                                </div>
+                                <div class="record-url-input">
+                                    <label>牌谱网址:</label>
+                                    <input type="url"
+                                           name="record_url_${table.tableId}"
+                                           value="${table.recordUrl || ''}"
+                                           placeholder="https://..."
+                                           maxlength="500">
+                                </div>
+                            </div>
+                        `;
+                    }).join('')}
+                    <div class="score-input-group advance-round">
                         <label>
-                            <input type="checkbox" name="advance_round">
+                            <input type="checkbox" name="advance_round" checked>
                             录入后进入下一场次（不勾选则保持当前场次）
                         </label>
                     </div>
@@ -282,15 +318,15 @@ const App = {
                 </form>
             </div>
         `;
-        
+
         document.body.appendChild(dialog);
-        
+
         // 绑定事件
         document.getElementById('score-form').addEventListener('submit', async (e) => {
             e.preventDefault();
             await this.submitScores(dialog);
         });
-        
+
         document.getElementById('cancel-score-btn').addEventListener('click', () => {
             dialog.remove();
         });
@@ -303,6 +339,8 @@ const App = {
         const form = document.getElementById('score-form');
         const formData = new FormData(form);
         const scores = {};
+        const ratings = {};
+        const recordUrls = {};
         let advanceRound = false;
         let hasValidationError = false;
 
@@ -311,25 +349,49 @@ const App = {
 
             if (key === 'advance_round') {
                 advanceRound = value === 'on';
-            } else {
-                const playerId = parseInt(key.replace('player_', ''));
+            } else if (key.startsWith('score_')) {
+                // 处理积分: score_{tableId}_{playerId}
+                const [, tableIdStr, playerIdStr] = key.split('_');
+                const tableId = parseInt(tableIdStr);
+                const playerId = parseInt(playerIdStr);
                 const scoreValue = parseFloat(value);
 
-                // 验证小数位数（最多1位小数）
+                // 验证积分格式
                 if (isNaN(scoreValue)) {
-                    Utils.showMessage(`选手ID ${playerId} 的分数格式不正确`, 'error');
+                    Utils.showMessage(`第${tableId}桌选手ID ${playerId} 的分数格式不正确`, 'error');
                     hasValidationError = true;
                     return;
                 }
 
-                // 检查小数位数
+                // 检查小数位数（最多1位小数）
                 if (value.includes('.') && value.split('.')[1].length > 1) {
-                    Utils.showMessage(`选手ID ${playerId} 的分数最多只能有1位小数`, 'error');
+                    Utils.showMessage(`第${tableId}桌选手ID ${playerId} 的分数最多只能有1位小数`, 'error');
                     hasValidationError = true;
                     return;
                 }
 
                 scores[playerId] = scoreValue;
+            } else if (key.startsWith('rating_')) {
+                // 处理评分: rating_{tableId}_{playerId}
+                const [, tableIdStr, playerIdStr] = key.split('_');
+                const tableId = parseInt(tableIdStr);
+                const playerId = parseInt(playerIdStr);
+
+                if (!ratings[tableId]) ratings[tableId] = {};
+                ratings[tableId][playerId] = value.trim();
+            } else if (key.startsWith('record_url_')) {
+                // 处理牌谱网址: record_url_{tableId}
+                const [, tableIdStr] = key.split('_');
+                const tableId = parseInt(tableIdStr);
+
+                // 验证URL格式（如果有值的话）
+                if (value.trim() && !this.isValidUrl(value.trim())) {
+                    Utils.showMessage(`第${tableId}桌的牌谱网址格式不正确`, 'error');
+                    hasValidationError = true;
+                    return;
+                }
+
+                recordUrls[tableId] = value.trim();
             }
         });
 
@@ -337,7 +399,13 @@ const App = {
             return;
         }
 
-        if (await Game.completeRound(scores, advanceRound)) {
+        const options = {
+            ratings,
+            recordUrls,
+            advanceRound
+        };
+
+        if (await Game.completeRound(scores, options)) {
             dialog.remove();
             await this.renderMainPage();
         }
@@ -417,6 +485,18 @@ const App = {
             if (await Game.regroupCurrentGame(method)) {
                 await this.renderMainPage();
             }
+        }
+    },
+
+    /**
+     * 验证URL格式
+     */
+    isValidUrl(string) {
+        try {
+            new URL(string);
+            return true;
+        } catch (_) {
+            return false;
         }
     },
 

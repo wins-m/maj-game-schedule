@@ -164,7 +164,43 @@ const Storage = {
      */
     importData(data) {
         if (data.players) this.savePlayers(data.players);
-        if (data.games) this.saveGames(data.games);
+        if (data.games) {
+            // 迁移导入的游戏数据
+            const migratedGames = data.games.map(game => {
+                // 这里需要导入Game模块来使用migrateGameData方法
+                // 简单起见，我们在这里直接进行迁移
+                if (game && game.tables) {
+                    game.tables.forEach(table => {
+                        // 初始化积分对象
+                        if (!table.scores) {
+                            table.scores = {};
+                            if (table.players && table.players.length > 0) {
+                                table.players.forEach(playerId => {
+                                    table.scores[playerId] = 0;
+                                });
+                            }
+                        }
+
+                        // 初始化评分对象
+                        if (!table.ratings) {
+                            table.ratings = {};
+                            if (table.players && table.players.length > 0) {
+                                table.players.forEach(playerId => {
+                                    table.ratings[playerId] = '';
+                                });
+                            }
+                        }
+
+                        // 初始化牌谱网址
+                        if (!table.recordUrl) {
+                            table.recordUrl = '';
+                        }
+                    });
+                }
+                return game;
+            });
+            this.saveGames(migratedGames);
+        }
         if (data.schedules) this.saveSchedules(data.schedules);
         if (data.currentRound) this.setCurrentRound(data.currentRound);
     }

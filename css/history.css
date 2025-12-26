@@ -1,0 +1,242 @@
+/* 历史记录页面样式 */
+
+.header-content {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    width: 100%;
+}
+
+.history-filters {
+    display: flex;
+    gap: 20px;
+    margin-bottom: 20px;
+    padding: 20px;
+    background: #f9f9f9;
+    border-radius: 8px;
+    border: 1px solid #e0e0e0;
+}
+
+.filter-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.filter-group label {
+    font-weight: 500;
+    color: #666;
+    white-space: nowrap;
+}
+
+.filter-group select {
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    min-width: 120px;
+}
+
+.history-table-container {
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    overflow: hidden;
+}
+
+.history-table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+.history-table thead {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.history-table th,
+.history-table td {
+    padding: 12px 15px;
+    text-align: left;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.history-table th {
+    font-weight: 600;
+    font-size: 14px;
+}
+
+.history-table td {
+    font-size: 14px;
+}
+
+.history-table tbody tr:hover {
+    background: #f5f5f5;
+}
+
+.history-table tbody tr:nth-child(even) {
+    background: #fafafa;
+}
+
+.history-table a {
+    color: #667eea;
+    text-decoration: none;
+    word-break: break-all;
+}
+
+.history-table a:hover {
+    text-decoration: underline;
+}
+
+.btn-edit {
+    padding: 6px 12px;
+    background: #2196F3;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.btn-edit:hover {
+    background: #0b7dda;
+}
+
+.no-data {
+    text-align: center;
+    padding: 60px 20px;
+    color: #666;
+    font-size: 16px;
+}
+
+/* 编辑对话框样式 */
+.edit-info {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f0f8ff;
+    border-radius: 6px;
+    border-left: 4px solid #667eea;
+}
+
+.edit-info p {
+    margin: 0;
+    color: #333;
+    font-weight: 500;
+}
+
+.edit-player-item {
+    margin-bottom: 20px;
+    padding: 15px;
+    background: #f9f9f9;
+    border-radius: 6px;
+    border: 1px solid #e0e0e0;
+}
+
+.edit-player-item .player-info {
+    margin-bottom: 10px;
+}
+
+.edit-player-item .player-name {
+    font-weight: 600;
+    color: #333;
+    display: block;
+    margin-bottom: 4px;
+}
+
+.edit-player-item .current-score {
+    font-size: 12px;
+    color: #666;
+}
+
+.edit-player-item .input-group {
+    margin-bottom: 10px;
+}
+
+.edit-player-item .input-group label {
+    display: block;
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 3px;
+    font-weight: 500;
+}
+
+.edit-player-item .input-group input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.edit-player-item .input-group input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.record-url-edit {
+    margin-top: 20px;
+    padding-top: 15px;
+    border-top: 1px solid #e0e0e0;
+}
+
+.record-url-edit label {
+    display: block;
+    font-size: 14px;
+    color: #666;
+    margin-bottom: 5px;
+    font-weight: 500;
+}
+
+.record-url-edit input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+    transition: border-color 0.3s ease;
+}
+
+.record-url-edit input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .header-content {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 15px;
+    }
+
+    .history-filters {
+        flex-direction: column;
+        gap: 15px;
+    }
+
+    .history-table {
+        font-size: 12px;
+    }
+
+    .history-table th,
+    .history-table td {
+        padding: 8px 10px;
+    }
+
+    .btn-edit {
+        padding: 4px 8px;
+        font-size: 11px;
+    }
+}
+
+@media (max-width: 480px) {
+    .history-table-container {
+        overflow-x: auto;
+    }
+
+    .history-table {
+        min-width: 600px;
+    }
+}
