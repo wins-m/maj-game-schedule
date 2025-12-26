@@ -617,7 +617,7 @@
                                 if (table.players && table.players.includes(playerId)) {
                                     participated = true;
                                     const score = table.scores ? table.scores[playerId] || 0 : 0;
-                                    totalScore += score;
+                                    totalScore = parseFloat((totalScore + score).toFixed(1));
                                 }
                             });
 

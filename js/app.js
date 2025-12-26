@@ -143,7 +143,7 @@ const App = {
                                         ✏️
                                     </button>
                                 </div>
-                                <span class="player-score">积分: ${player.totalScore.toFixed(1)}</span>
+                                <span class="player-score">积分: ${Utils.displayScore(player.totalScore)}</span>
                                 <span class="fill-status ${player.hasFilledSchedule ? 'filled' : 'unfilled'}">
                                     ${player.hasFilledSchedule ? '✓ 已填表' : '○ 未填表'}
                                 </span>
@@ -272,7 +272,7 @@ const App = {
                                         <div class="player-score-input">
                                             <div class="player-info">
                                                 <span class="player-name">${player.name}</span>
-                                                <span class="current-score">当前积分: ${player.totalScore.toFixed(1)}</span>
+                                                <span class="current-score">当前积分: ${Utils.displayScore(player.totalScore)}</span>
                                             </div>
                                             <div class="input-group">
                                                 <label>积分:</label>

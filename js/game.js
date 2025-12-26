@@ -4,6 +4,14 @@
 
 const Game = {
     /**
+     * 格式化分数，确保精度为一位小数
+     * @param {number} score - 原始分数
+     * @returns {number} 格式化后的分数（一位小数精度）
+     */
+    formatScore(score) {
+        return parseFloat(score.toFixed(1));
+    },
+    /**
      * 根据积分排名进行分桌（蛇形分组）
      * @param {Array} players - 选手数组（已按积分排序）
      * @param {number} playersPerTable - 每桌人数，默认4
@@ -225,8 +233,9 @@ const Game = {
         const players = await Storage.getPlayers();
         players.forEach(player => {
             const score = scores[player.id] || 0;
-            player.scores.push(score);
-            player.totalScore += score;
+            const formattedScore = this.formatScore(score);
+            player.scores.push(formattedScore);
+            player.totalScore = this.formatScore(player.totalScore + formattedScore);
             // 只有进入下一场次时才重置时间表填写状态
             if (advanceRound) {
                 player.hasFilledSchedule = false;

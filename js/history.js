@@ -149,7 +149,7 @@ const History = {
                         row.innerHTML = `
                             <td rowspan="4" class="table-cell">${tableCell}</td>
                             <td>${player.name}</td>
-                            <td>${table.scores ? (table.scores[player.id] || 0).toFixed(1) : '0.0'}</td>
+                            <td>${table.scores ? Utils.displayScore(table.scores[player.id] || 0) : '0.0'}</td>
                             <td>${table.ratings ? (table.ratings[player.id] || '') : ''}</td>
                             <td rowspan="4" class="action-cell">
                                 <button class="btn-edit" data-round="${game.round}" data-table="${table.tableId}">编辑</button>
@@ -159,7 +159,7 @@ const History = {
                         // 其他行：只显示选手信息
                         row.innerHTML = `
                             <td>${player.name}</td>
-                            <td>${table.scores ? (table.scores[player.id] || 0).toFixed(1) : '0.0'}</td>
+                            <td>${table.scores ? Utils.displayScore(table.scores[player.id] || 0) : '0.0'}</td>
                             <td>${table.ratings ? (table.ratings[player.id] || '') : ''}</td>
                         `;
                     }
@@ -360,7 +360,7 @@ const History = {
             playerDiv.innerHTML = `
                 <div class="player-info">
                     <span class="position-label">位置 ${i + 1}:</span>
-                    ${currentPlayer ? `<span class="current-score">当前积分: ${currentPlayer.totalScore.toFixed(1)}</span>` : ''}
+                    ${currentPlayer ? `<span class="current-score">当前积分: ${Utils.displayScore(currentPlayer.totalScore)}</span>` : ''}
                 </div>
                 <div class="input-group">
                     <label>选手姓名:</label>

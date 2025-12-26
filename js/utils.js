@@ -192,6 +192,36 @@ const Utils = {
      */
     confirm(message) {
         return window.confirm(message);
+    },
+
+    /**
+     * 格式化分数，确保精度为一位小数
+     * @param {number|string} score - 原始分数
+     * @returns {number} 格式化后的分数（一位小数精度）
+     */
+    formatScore(score) {
+        const num = typeof score === 'string' ? parseFloat(score) : score;
+        if (isNaN(num)) return 0;
+        return parseFloat(num.toFixed(1));
+    },
+
+    /**
+     * 验证分数格式
+     * @param {string} scoreStr - 分数字符串
+     * @returns {boolean} 是否为有效分数
+     */
+    isValidScore(scoreStr) {
+        const num = parseFloat(scoreStr);
+        return !isNaN(num) && isFinite(num);
+    },
+
+    /**
+     * 将分数转换为显示格式
+     * @param {number} score - 分数
+     * @returns {string} 格式化后的分数字符串
+     */
+    displayScore(score) {
+        return this.formatScore(score).toFixed(1);
     }
 };
 
