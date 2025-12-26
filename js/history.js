@@ -435,34 +435,74 @@ const History = {
         table.ratings = updates.ratings;
         table.recordUrl = updates.recordUrl;
 
-        // 重新计算所有选手的总积分
-        const allGames = await Storage.getGames();
+        // 数据清理：确保只保存可序列化的基本数据类型
+        const cleanedGame = this.sanitizeGameData(game);
 
-        // 为所有选手重新计算总积分
-        allPlayers.forEach(player => {
-            let totalScore = 0;
-            allGames.forEach(g => {
-                if (g.isCompleted && g.tables) {
-                    g.tables.forEach(t => {
-                        if (t.scores && t.scores[player.id] !== undefined) {
-                            totalScore += t.scores[player.id];
-                        }
-                    });
-                }
-            });
-
-            player.totalScore = totalScore;
-        });
-
-        // 保存数据
-        await Storage.saveGame(game);
-        await Storage.savePlayers(players);
+        // 只保存游戏数据，不修改选手的累积得分
+        await Storage.saveGame(cleanedGame);
 
         dialog.style.display = 'none';
         Utils.showMessage('历史记录已更新', 'success');
 
         // 重新渲染页面
         await this.renderHistoryPage();
+
+        // 自动刷新网页
+        setTimeout(() => {
+            window.location.reload();
+        }, 1000); // 1秒后刷新，给用户一点时间看到成功消息
+    },
+
+
+    /**
+     * 清理游戏数据，确保只包含可序列化的基本数据类型
+     */
+    sanitizeGameData(game) {
+        if (!game) return game;
+
+        // 深拷贝游戏对象，避免修改原始对象
+        const cleanedGame = JSON.parse(JSON.stringify(game));
+
+        // 确保基本字段存在且为正确类型
+        cleanedGame.round = parseInt(cleanedGame.round) || 0;
+        cleanedGame.isCompleted = Boolean(cleanedGame.isCompleted);
+        cleanedGame.createTime = cleanedGame.createTime || new Date().toISOString();
+
+        // 清理桌数据
+        if (cleanedGame.tables && Array.isArray(cleanedGame.tables)) {
+            cleanedGame.tables = cleanedGame.tables.map(table => {
+                const cleanedTable = {
+                    tableId: parseInt(table.tableId) || 0,
+                    players: Array.isArray(table.players) ? table.players.map(id => parseInt(id)) : [],
+                    scores: {},
+                    ratings: {},
+                    recordUrl: String(table.recordUrl || '')
+                };
+
+                // 清理积分数据
+                if (table.scores && typeof table.scores === 'object') {
+                    Object.keys(table.scores).forEach(playerId => {
+                        const score = parseFloat(table.scores[playerId]);
+                        if (!isNaN(score)) {
+                            cleanedTable.scores[playerId] = score;
+                        }
+                    });
+                }
+
+                // 清理评分数据
+                if (table.ratings && typeof table.ratings === 'object') {
+                    Object.keys(table.ratings).forEach(playerId => {
+                        cleanedTable.ratings[playerId] = String(table.ratings[playerId] || '');
+                    });
+                }
+
+                return cleanedTable;
+            });
+        } else {
+            cleanedGame.tables = [];
+        }
+
+        return cleanedGame;
     },
 
     /**

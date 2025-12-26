@@ -12,6 +12,9 @@ const app = express();
 const PORT = process.env.PORT || 1414;
 const DATA_DIR = path.join(__dirname, 'data');
 
+// 文件锁管理
+const fileLocks = new Map();
+
 // 中间件
 app.use(cors());
 app.use(express.json());
@@ -25,25 +28,84 @@ async function ensureDataDir() {
     }
 }
 
-// 读取数据文件
+// 文件锁管理函数
+async function acquireLock(filename) {
+    const lockKey = filename;
+    while (fileLocks.get(lockKey)) {
+        // 等待锁释放
+        await new Promise(resolve => setTimeout(resolve, 10));
+    }
+    fileLocks.set(lockKey, true);
+}
+
+function releaseLock(filename) {
+    const lockKey = filename;
+    fileLocks.delete(lockKey);
+}
+
+// 读取数据文件（带错误恢复）
 async function readDataFile(filename) {
     try {
         const filePath = path.join(DATA_DIR, filename);
         const data = await fs.readFile(filePath, 'utf8');
-        return JSON.parse(data);
+        const parsed = JSON.parse(data);
+
+        // 验证JSON结构完整性
+        if (parsed === null || parsed === undefined) {
+            throw new Error('JSON数据为空');
+        }
+
+        return parsed;
     } catch (error) {
         if (error.code === 'ENOENT') {
             // 文件不存在，返回默认值
             return null;
         }
+
+        console.error(`读取文件 ${filename} 失败:`, error.message);
+
+        // 尝试从备份恢复（如果有的话）
+        try {
+            const backupPath = path.join(DATA_DIR, filename + '.backup');
+            const backupData = await fs.readFile(backupPath, 'utf8');
+            const parsedBackup = JSON.parse(backupData);
+            console.log(`从备份恢复了 ${filename}`);
+            // 恢复后重新保存一份正常的备份
+            await writeDataFile(filename, parsedBackup);
+            return parsedBackup;
+        } catch (backupError) {
+            console.error(`备份恢复失败:`, backupError.message);
+        }
+
+        // 如果都失败了，抛出原始错误
         throw error;
     }
 }
 
-// 写入数据文件
+// 写入数据文件（带文件锁和备份）
 async function writeDataFile(filename, data) {
-    const filePath = path.join(DATA_DIR, filename);
-    await fs.writeFile(filePath, JSON.stringify(data, null, 2), 'utf8');
+    await acquireLock(filename);
+    try {
+        const filePath = path.join(DATA_DIR, filename);
+        // 确保目录存在
+        await ensureDataDir();
+
+        // 在写入前创建备份（如果原文件存在）
+        try {
+            await fs.access(filePath);
+            const backupPath = filePath + '.backup';
+            await fs.copyFile(filePath, backupPath);
+        } catch (error) {
+            // 原文件不存在，跳过备份
+        }
+
+        // 原子写入：先写入临时文件，然后重命名
+        const tempFile = filePath + '.tmp';
+        await fs.writeFile(tempFile, JSON.stringify(data, null, 2), 'utf8');
+        await fs.rename(tempFile, filePath);
+    } finally {
+        releaseLock(filename);
+    }
 }
 
 // ========== API 路由 ==========
@@ -62,6 +124,18 @@ app.get('/api/players', async (req, res) => {
 // 保存所有选手
 app.post('/api/players', async (req, res) => {
     try {
+        // 数据验证
+        if (!Array.isArray(req.body)) {
+            return res.status(400).json({ error: '选手数据必须是数组' });
+        }
+
+        // 验证每个选手的数据结构
+        for (const player of req.body) {
+            if (!player.id || !player.name) {
+                return res.status(400).json({ error: '选手数据结构不正确，缺少id或name字段' });
+            }
+        }
+
         await writeDataFile('players.json', req.body);
         res.json({ success: true });
     } catch (error) {
@@ -81,9 +155,76 @@ app.get('/api/games', async (req, res) => {
     }
 });
 
+// 保存单个比赛（避免并发冲突）
+app.post('/api/game/:round', async (req, res) => {
+    try {
+        const round = parseInt(req.params.round);
+        const updatedGame = req.body;
+
+        // 数据验证
+        if (!updatedGame || typeof updatedGame.round !== 'number') {
+            return res.status(400).json({ error: '比赛数据结构不正确，缺少有效的round字段' });
+        }
+
+        if (updatedGame.round !== round) {
+            return res.status(400).json({ error: '比赛场次不匹配' });
+        }
+
+        // 验证桌数据结构
+        if (updatedGame.tables && !Array.isArray(updatedGame.tables)) {
+            return res.status(400).json({ error: '桌数据必须是数组' });
+        }
+
+        // 验证每桌的数据结构
+        if (updatedGame.tables) {
+            for (const table of updatedGame.tables) {
+                if (typeof table.tableId !== 'number') {
+                    return res.status(400).json({ error: '桌数据结构不正确，缺少有效的tableId字段' });
+                }
+            }
+        }
+
+        // 读取现有游戏数据
+        let games = [];
+        try {
+            games = await readDataFile('games.json') || [];
+        } catch (error) {
+            console.log('读取游戏数据失败，使用空数组:', error.message);
+            games = [];
+        }
+
+        // 查找并更新指定的游戏
+        const gameIndex = games.findIndex(g => g.round === round);
+        if (gameIndex !== -1) {
+            games[gameIndex] = updatedGame;
+        } else {
+            games.push(updatedGame);
+        }
+
+        // 保存更新后的游戏数据
+        await writeDataFile('games.json', games);
+        res.json({ success: true });
+    } catch (error) {
+        console.error('保存单个比赛失败:', error);
+        res.status(500).json({ error: '保存数据失败' });
+    }
+});
+
 // 保存所有比赛
 app.post('/api/games', async (req, res) => {
     try {
+        // 数据验证
+        if (!Array.isArray(req.body)) {
+            return res.status(400).json({ error: '比赛数据必须是数组' });
+        }
+
+        // 验证每个比赛的数据结构
+        for (const game of req.body) {
+            if (!game.round) {
+                return res.status(400).json({ error: '比赛数据结构不正确，缺少round字段' });
+            }
+        }
+
         await writeDataFile('games.json', req.body);
         res.json({ success: true });
     } catch (error) {
