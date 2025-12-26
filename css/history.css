@@ -95,6 +95,12 @@
     vertical-align: middle;
 }
 
+/* 确保桌次单元格和操作单元格不受选手高亮影响 */
+.table-cell,
+.action-cell {
+    background-color: inherit !important;
+}
+
 .table-link {
     color: #667eea;
     text-decoration: none;
@@ -111,13 +117,9 @@
     vertical-align: middle;
 }
 
-.highlighted-player {
+.highlighted-player-cell {
     font-weight: bold;
     background-color: #fff3cd !important;
-}
-
-.highlighted-player td {
-    font-weight: bold;
 }
 
 .btn-edit {

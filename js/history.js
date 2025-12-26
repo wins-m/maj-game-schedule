@@ -274,11 +274,25 @@ const History = {
                 table.rows.forEach(row => {
                     row.style.display = shouldShow ? '' : 'none';
 
-                    // 如果该行对应的选手是被筛选的选手，添加加粗样式
+                    // 移除行的整体高亮样式
+                    row.classList.remove('highlighted-player');
+
+                    // 如果该行对应的选手是被筛选的选手，给选手相关单元格添加高亮样式
                     if (shouldShow && row.dataset.player === playerFilter) {
-                        row.classList.add('highlighted-player');
+                        // 获取行内的所有单元格
+                        const cells = row.querySelectorAll('td');
+                        cells.forEach(cell => {
+                            // 高亮所有单元格，除了桌次列和操作列
+                            if (!cell.classList.contains('table-cell') && !cell.classList.contains('action-cell')) {
+                                cell.classList.add('highlighted-player-cell');
+                            }
+                        });
                     } else {
-                        row.classList.remove('highlighted-player');
+                        // 移除所有单元格的高亮样式
+                        const cells = row.querySelectorAll('td');
+                        cells.forEach(cell => {
+                            cell.classList.remove('highlighted-player-cell');
+                        });
                     }
                 });
             });
@@ -293,7 +307,10 @@ const History = {
 
                 row.style.display = (roundMatch && tableMatch) ? '' : 'none';
                 // 移除所有高亮样式
-                row.classList.remove('highlighted-player');
+                const cells = row.querySelectorAll('td');
+                cells.forEach(cell => {
+                    cell.classList.remove('highlighted-player-cell');
+                });
             });
         }
     },
