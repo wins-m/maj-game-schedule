@@ -134,7 +134,7 @@ const History = {
 
                     // 第一行：桌次列合并，显示桌次和编辑按钮
                     if (index === 0) {
-                        const tableText = `第${game.round}场${table.tableId === 1 ? '哥哥桌' : '弟弟桌'}`;
+                        const tableText = `第${game.round}场第${table.tableId}桌`;
                         const tableCell = table.recordUrl ?
                             `<a href="${table.recordUrl}" target="_blank" rel="noopener noreferrer" class="table-link">${tableText}</a>` :
                             tableText;
@@ -312,7 +312,7 @@ const History = {
 
         // 填充编辑信息
         const editInfoText = document.getElementById('edit-info-text');
-        editInfoText.textContent = `编辑第${round}场${tableId === 1 ? '哥哥桌' : '弟弟桌'}的记录`;
+        editInfoText.textContent = `编辑第${round}场第${tableId}桌的记录`;
 
         // 填充选手编辑区域
         const playersContainer = document.getElementById('edit-players-container');
