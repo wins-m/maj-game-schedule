@@ -6,6 +6,7 @@
     <title>个人时间表</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/schedule.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
@@ -54,6 +55,10 @@
             let hasUnsavedChanges = false;
             // 记录初始状态，用于比较
             let initialSelectedTimes = [];
+            // 图表渲染状态标志
+            window.isRenderingChart = false;
+            window.chartRendered = false;
+            window.scoreChartInstance = null; // 确保初始状态为null
 
             // 初始化
             (async function() {
@@ -72,7 +77,19 @@
                     playerInfoEl.innerHTML = `
                         <h2>${player.name} 的时间表</h2>
                         <p>当前积分：${player.totalScore}</p>
+                        <div class="score-chart-container">
+                            <h3>历史得分记录</h3>
+                            <canvas id="scoreChart" width="400" height="200"></canvas>
+                        </div>
                     `;
+
+                    // 渲染历史得分图表
+                    setTimeout(() => {
+                        if (!window.chartRendered) {
+                            renderScoreChart(playerId);
+                            window.chartRendered = true;
+                        }
+                    }, 50);
 
                     // 渲染时间表
                     await renderSchedule();
@@ -106,6 +123,18 @@
                     e.preventDefault();
                     e.returnValue = '您有未保存的更改，确定要离开吗？';
                     return e.returnValue;
+                }
+            });
+
+            // 页面卸载时清理图表
+            window.addEventListener('unload', function() {
+                if (window.scoreChartInstance) {
+                    try {
+                        window.scoreChartInstance.destroy();
+                        window.scoreChartInstance = null;
+                    } catch (e) {
+                        console.warn('页面卸载时清理图表失败:', e);
+                    }
                 }
             });
 
@@ -360,12 +389,252 @@
                 if (Utils.confirm('确定要清空所有选择吗？')) {
                     await Schedule.savePlayerSchedule(playerId, []);
                     await renderSchedule();
-                    
+
                     // 更新初始状态
                     initialSelectedTimes = [];
                     hasUnsavedChanges = false;
-                    
+
                     Utils.showMessage('已清空选择', 'success');
+                }
+            }
+
+            /**
+             * 渲染选手历史得分图表
+             */
+            async function renderScoreChart(playerId) {
+                try {
+                    console.log('开始渲染图表，playerId:', playerId, '时间:', new Date().toISOString());
+
+                    // 防止重复渲染
+                    if (window.isRenderingChart) {
+                        console.log('图表正在渲染中，跳过重复调用');
+                        return;
+                    }
+                    window.isRenderingChart = true;
+
+                    // 获取容器元素（提前声明，避免重复声明）
+                    const chartContainer = document.querySelector('.score-chart-container');
+
+                    // 检查DOM元素
+                    let canvas = document.getElementById('scoreChart');
+                    if (!canvas) {
+                        console.warn('图表画布元素未找到');
+                        window.isRenderingChart = false;
+                        return;
+                    }
+
+                    // 获取历史得分数据
+                    const scoreData = await getPlayerScoreHistory(playerId);
+
+                    if (scoreData.length === 0) {
+                        // 如果没有历史数据，显示提示信息
+                        canvas.style.display = 'none';
+                        if (chartContainer) {
+                            // 移除现有的无数据消息
+                            const existingMsg = chartContainer.querySelector('p');
+                            if (existingMsg) {
+                                existingMsg.remove();
+                            }
+                            const noDataMsg = document.createElement('p');
+                            noDataMsg.textContent = '暂无历史得分记录';
+                            noDataMsg.style.color = 'white';
+                            noDataMsg.style.textAlign = 'center';
+                            noDataMsg.style.fontStyle = 'italic';
+                            chartContainer.appendChild(noDataMsg);
+                        }
+                        window.isRenderingChart = false;
+                        return;
+                    }
+
+                    // 显示画布
+                    canvas.style.display = 'block';
+
+                    // 移除无数据消息
+                    if (chartContainer) {
+                        const existingMsg = chartContainer.querySelector('p');
+                        if (existingMsg) {
+                            existingMsg.remove();
+                        }
+                    }
+
+                    // 彻底清理之前的图表实例和DOM元素
+                    if (window.scoreChartInstance) {
+                        try {
+                            console.log('销毁旧图表实例');
+                            window.scoreChartInstance.destroy();
+                            window.scoreChartInstance = null;
+                        } catch (destroyError) {
+                            console.warn('销毁旧图表失败:', destroyError);
+                        }
+                    }
+
+                    // 清理所有可能的Chart实例引用
+                    if (window.Chart && window.Chart.instances) {
+                        console.log('清理Chart实例数组');
+                        Object.keys(window.Chart.instances).forEach(key => {
+                            try {
+                                window.Chart.instances[key].destroy();
+                                delete window.Chart.instances[key];
+                            } catch (e) {
+                                console.warn('清理Chart实例失败:', e);
+                            }
+                        });
+                    }
+
+                    // 完全重建canvas元素，避免残留状态
+                    if (chartContainer) {
+                        // 移除旧的canvas
+                        const oldCanvas = chartContainer.querySelector('#scoreChart');
+                        if (oldCanvas) {
+                            oldCanvas.remove();
+                        }
+
+                        // 创建新的canvas
+                        const newCanvas = document.createElement('canvas');
+                        newCanvas.id = 'scoreChart';
+                        newCanvas.width = 400;
+                        newCanvas.height = 200;
+
+                        // 重新插入到容器中（在h3后面）
+                        const h3 = chartContainer.querySelector('h3');
+                        if (h3) {
+                            h3.insertAdjacentElement('afterend', newCanvas);
+                        } else {
+                            chartContainer.appendChild(newCanvas);
+                        }
+
+                        // 更新canvas引用
+                        canvas = newCanvas;
+                    }
+
+                    // 获取canvas上下文（在canvas可能被重新赋值后）
+                    const ctx = canvas.getContext('2d');
+
+                    // 创建新的折线图
+                    window.scoreChartInstance = new Chart(ctx, {
+                        type: 'line',
+                        data: {
+                            labels: scoreData.map(item => `第${item.round}场`),
+                            datasets: [{
+                                label: '场次得分',
+                                data: scoreData.map(item => item.score),
+                                borderColor: 'rgba(255, 255, 255, 0.9)',
+                                backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                                borderWidth: 3,
+                                fill: true,
+                                tension: 0.4,
+                                pointBackgroundColor: 'rgba(255, 255, 255, 1)',
+                                pointBorderColor: 'rgba(255, 255, 255, 1)',
+                                pointBorderWidth: 2,
+                                pointRadius: 6,
+                                pointHoverRadius: 8
+                            }]
+                        },
+                        options: {
+                            responsive: false,
+                            plugins: {
+                                legend: {
+                                    labels: {
+                                        color: 'white',
+                                        font: { size: 14 }
+                                    }
+                                },
+                                tooltip: {
+                                    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+                                    titleColor: 'white',
+                                    bodyColor: 'white',
+                                    callbacks: {
+                                        label: function(context) {
+                                            return `得分: ${context.parsed.y}`;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    ticks: {
+                                        color: 'white',
+                                        font: { size: 12 }
+                                    },
+                                    grid: {
+                                        color: 'rgba(255, 255, 255, 0.2)'
+                                    }
+                                },
+                                y: {
+                                    beginAtZero: false,
+                                    ticks: {
+                                        color: 'white',
+                                        font: { size: 12 },
+                                        callback: function(value) {
+                                            return value.toFixed(1);
+                                        }
+                                    },
+                                    grid: {
+                                        color: 'rgba(255, 255, 255, 0.2)'
+                                    }
+                                }
+                            },
+                            elements: {
+                                point: {
+                                    hoverBorderWidth: 3
+                                }
+                            }
+                        }
+                    });
+
+                    console.log('图表渲染完成');
+
+                } catch (error) {
+                    console.error('渲染图表出错:', error);
+                    // 错误处理
+                    const canvas = document.getElementById('scoreChart');
+                    if (canvas) {
+                        canvas.style.display = 'none';
+                    }
+                } finally {
+                    // 确保标志位被重置
+                    window.isRenderingChart = false;
+                }
+            }
+
+            /**
+             * 获取选手的历史得分数据
+             */
+            async function getPlayerScoreHistory(playerId) {
+                try {
+                    const games = await Storage.getGames();
+
+                    // 按场次整理得分数据
+                    const scoreHistory = [];
+
+                    games.forEach(game => {
+                        if (game.isCompleted && game.tables) {
+                            let totalScore = 0;
+                            let participated = false;
+
+                            // 计算该选手在该场次的所有桌子的得分总和
+                            game.tables.forEach(table => {
+                                if (table.players && table.players.includes(playerId)) {
+                                    participated = true;
+                                    const score = table.scores ? table.scores[playerId] || 0 : 0;
+                                    totalScore += score;
+                                }
+                            });
+
+                            if (participated) {
+                                scoreHistory.push({
+                                    round: game.round,
+                                    score: totalScore
+                                });
+                            }
+                        }
+                    });
+
+                    // 按场次排序
+                    return scoreHistory.sort((a, b) => a.round - b.round);
+                } catch (error) {
+                    console.error('获取选手历史得分失败:', error);
+                    return [];
                 }
             }
         })();
