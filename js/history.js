@@ -125,6 +125,13 @@ const History = {
                     return player;
                 }).filter(p => p); // 过滤掉不存在的选手
 
+                // 按积分降序排序选手
+                tablePlayers.sort((a, b) => {
+                    const scoreA = table.scores ? (table.scores[a.id] || 0) : 0;
+                    const scoreB = table.scores ? (table.scores[b.id] || 0) : 0;
+                    return scoreB - scoreA; // 降序排列
+                });
+
                 // 为每桌创建4行记录
                 tablePlayers.forEach((player, index) => {
                     const row = document.createElement('tr');
