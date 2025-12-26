@@ -223,6 +223,12 @@ const History = {
         if (exportBtn) {
             exportBtn.addEventListener('click', () => this.exportHistory());
         }
+
+        // 导入历史记录
+        const importBtn = document.getElementById('import-history-btn');
+        if (importBtn) {
+            importBtn.addEventListener('click', () => this.importHistory());
+        }
     },
 
     /**
@@ -549,6 +555,261 @@ const History = {
             Utils.showMessage('历史记录已导出', 'success');
         } catch (error) {
             Utils.showMessage('导出历史记录失败', 'error');
+        }
+    },
+
+    /**
+     * 导入历史记录
+     */
+    async importHistory() {
+        const fileInput = document.getElementById('import-file-input');
+        if (!fileInput) {
+            Utils.showMessage('导入功能不可用', 'error');
+            return;
+        }
+
+        // 触发文件选择对话框
+        fileInput.click();
+
+        // 监听文件选择事件
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            try {
+                // 读取文件内容
+                const text = await this.readFileAsText(file);
+
+                // 解析JSON数据
+                const importData = JSON.parse(text);
+
+                // 判断数据格式并相应处理
+                if (this.isFullSystemData(importData)) {
+                    // 完整系统数据格式，直接使用服务器导入API
+                    await this.importFullSystemData(importData);
+                } else if (this.isHistoryData(importData)) {
+                    // 历史记录格式，在前端处理
+                    if (!this.validateImportData(importData)) {
+                        return;
+                    }
+
+                    // 显示确认对话框
+                    const confirmMessage = `即将导入 ${importData.length} 场历史记录，现有数据将被覆盖。是否继续？`;
+                    if (!confirm(confirmMessage)) {
+                        return;
+                    }
+
+                    // 导入数据到存储系统
+                    await this.processImportData(importData);
+
+                    Utils.showMessage('历史记录导入成功', 'success');
+                } else {
+                    Utils.showMessage('导入文件格式不正确，请选择有效的历史记录导出文件', 'error');
+                    return;
+                }
+
+                // 重新渲染页面
+                await this.renderHistoryPage();
+
+                // 自动刷新网页
+                setTimeout(() => {
+                    window.location.reload();
+                }, 1000);
+
+            } catch (error) {
+                console.error('导入历史记录失败:', error);
+                Utils.showMessage('导入历史记录失败：' + error.message, 'error');
+            } finally {
+                // 清空文件输入，以便下次可以选择相同文件
+                fileInput.value = '';
+            }
+        }, { once: true }); // 只监听一次，避免重复绑定
+    },
+
+    /**
+     * 判断是否为完整系统数据格式
+     */
+    isFullSystemData(data) {
+        return data &&
+               typeof data === 'object' &&
+               (data.players || data.games || data.schedules || data.currentRound !== undefined);
+    },
+
+    /**
+     * 判断是否为历史记录数据格式
+     */
+    isHistoryData(data) {
+        return Array.isArray(data) &&
+               data.length > 0 &&
+               data[0].round !== undefined &&
+               Array.isArray(data[0].tables);
+    },
+
+    /**
+     * 导入完整系统数据
+     */
+    async importFullSystemData(data) {
+        // 显示确认对话框
+        const gamesCount = data.games ? data.games.length : 0;
+        const playersCount = data.players ? data.players.length : 0;
+        const confirmMessage = `即将导入完整的系统数据（${gamesCount}场游戏，${playersCount}个选手），现有数据将被覆盖。是否继续？`;
+
+        if (!confirm(confirmMessage)) {
+            return;
+        }
+
+        // 使用服务器的导入API
+        await Storage.importData(data);
+        Utils.showMessage('系统数据导入成功', 'success');
+    },
+
+    /**
+     * 读取文件内容为文本
+     */
+    readFileAsText(file) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onload = (e) => resolve(e.target.result);
+            reader.onerror = (e) => reject(new Error('文件读取失败'));
+            reader.readAsText(file);
+        });
+    },
+
+    /**
+     * 验证导入的数据格式
+     */
+    validateImportData(data) {
+        if (!Array.isArray(data)) {
+            Utils.showMessage('导入数据格式错误：应为数组格式', 'error');
+            return false;
+        }
+
+        if (data.length === 0) {
+            Utils.showMessage('导入数据为空', 'error');
+            return false;
+        }
+
+        // 验证每场游戏的数据结构
+        for (let i = 0; i < data.length; i++) {
+            const game = data[i];
+
+            if (!game.round || typeof game.round !== 'number') {
+                Utils.showMessage(`第${i + 1}场数据错误：缺少有效的场次信息`, 'error');
+                return false;
+            }
+
+            if (!Array.isArray(game.tables)) {
+                Utils.showMessage(`第${game.round}场数据错误：桌数据应为数组格式`, 'error');
+                return false;
+            }
+
+            // 验证每桌的数据结构
+            for (let j = 0; j < game.tables.length; j++) {
+                const table = game.tables[j];
+
+                if (!table.tableId || typeof table.tableId !== 'number') {
+                    Utils.showMessage(`第${game.round}场第${j + 1}桌数据错误：缺少有效的桌号`, 'error');
+                    return false;
+                }
+
+                if (!Array.isArray(table.players)) {
+                    Utils.showMessage(`第${game.round}场第${table.tableId}桌数据错误：选手数据应为数组格式`, 'error');
+                    return false;
+                }
+
+                // 验证选手数据结构
+                for (let k = 0; k < table.players.length; k++) {
+                    const player = table.players[k];
+
+                    if (!player.id || !player.name) {
+                        Utils.showMessage(`第${game.round}场第${table.tableId}桌第${k + 1}个选手数据错误：缺少ID或姓名`, 'error');
+                        return false;
+                    }
+
+                    if (typeof player.score !== 'number') {
+                        Utils.showMessage(`第${game.round}场第${table.tableId}桌选手${player.name}积分数据错误`, 'error');
+                        return false;
+                    }
+                }
+            }
+        }
+
+        return true;
+    },
+
+    /**
+     * 处理导入的数据
+     */
+    async processImportData(importData) {
+        try {
+            // 获取现有的选手数据，用于匹配导入的选手
+            const existingPlayers = await Storage.getPlayers();
+            const playerMap = new Map();
+            existingPlayers.forEach(player => {
+                playerMap.set(player.name, player.id);
+            });
+
+            // 处理每场游戏
+            for (const gameData of importData) {
+                const game = {
+                    round: gameData.round,
+                    isCompleted: true,
+                    createTime: new Date().toISOString(),
+                    tables: []
+                };
+
+                // 处理每桌
+                for (const tableData of gameData.tables) {
+                    const table = {
+                        tableId: tableData.tableId,
+                        players: [],
+                        scores: {},
+                        ratings: {},
+                        recordUrl: tableData.recordUrl || ''
+                    };
+
+                    // 处理每桌的选手
+                    for (const playerData of tableData.players) {
+                        let playerId = playerMap.get(playerData.name);
+
+                        // 如果选手不存在，创建新选手
+                        if (!playerId) {
+                            const existingPlayers = await Storage.getPlayers();
+                            const maxId = existingPlayers.length > 0 ? Math.max(...existingPlayers.map(p => p.id)) : 0;
+                            const newPlayer = {
+                                id: maxId + 1,
+                                name: playerData.name,
+                                totalScore: 0,
+                                gamesPlayed: 0,
+                                createTime: new Date().toISOString()
+                            };
+
+                            existingPlayers.push(newPlayer);
+                            await Storage.savePlayers(existingPlayers);
+                            playerId = newPlayer.id;
+                            playerMap.set(playerData.name, playerId);
+                        }
+
+                        // 添加到桌的选手列表
+                        table.players.push(playerId);
+
+                        // 设置积分和评分
+                        table.scores[playerId] = playerData.score;
+                        if (playerData.rating) {
+                            table.ratings[playerId] = playerData.rating;
+                        }
+                    }
+
+                    game.tables.push(table);
+                }
+
+                // 保存游戏数据
+                await Storage.saveGame(game);
+            }
+
+        } catch (error) {
+            console.error('处理导入数据失败:', error);
+            throw new Error('数据导入处理失败');
         }
     }
 };
